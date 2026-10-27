@@ -1,0 +1,24 @@
+Thì export cả schema + data vào một file:
+docker exec ptit-mysql sh -c 'mysqldump -u root -p"$MYSQL_ROOT_PASSWORD" --single-transaction --routines --triggers --databases identity_db core_db dashboard_db' > infrastructure\mysql\seed\team-data.sql
+
+ptit-mysql phải là tên container MySQL của bạn. Nếu không chắc:
+
+docker ps
+
+------------------------------------------------------------------------------------------------------------------------------------------------
+*Workflow:
+Bạn code/test
+     ↓
+MySQL Docker volume
+     ↓
+mysqldump
+     ↓
+infrastructure/mysql/seed/team-data.sql
+     ↓
+git push
+     ↓
+Teammate git pull
+     ↓
+docker compose up -d
+     ↓
+MySQL có cùng data test

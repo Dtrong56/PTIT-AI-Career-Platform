@@ -22,6 +22,7 @@ services:
     volumes:
       - mysql_data:/var/lib/mysql
       - ./infrastructure/mysql/init:/docker-entrypoint-initdb.d
+      - ./infrastructure/mysql/seed/team-data.sql:/docker-entrypoint-initdb.d/02-team-data.sql:ro
 
   rabbitmq:
     image: rabbitmq:4-management
