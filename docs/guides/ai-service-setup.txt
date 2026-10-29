@@ -1,0 +1,185 @@
+HƯỚNG DẪN CHẠY AI ENGINE SERVICE
+=================================
+
+Service: ai-engine-service
+Port: 8083
+
+1. YÊU CẦU
+
+- Java 21
+- Maven Wrapper đi kèm project
+- Docker Desktop đang chạy nếu cần RabbitMQ/Qdrant
+- Có Google API Key để sử dụng Gemini / Google GenAI
+
+
+2. CẤU HÌNH GOOGLE GENAI
+
+File cấu hình:
+
+ai-engine-service/src/main/resources/application.properties
+
+Phần Google GenAI:
+
+spring.ai.google.genai.api-key=${GOOGLE_API_KEY}
+spring.ai.google.genai.chat.model=gemini-2.5-flash
+
+spring.ai.google.genai.embedding.api-key=${GOOGLE_API_KEY}
+spring.ai.google.genai.embedding.text.model=text-embedding-004
+
+
+3. NHẬP GOOGLE API KEY VÀO POWERSHELL
+
+Mở PowerShell tại thư mục project:
+
+PS D:\DATN\PTIT-AI-Career-Platform>
+
+Nhập:
+
+$env:GOOGLE_API_KEY="API_KEY_CUA_BAN"
+
+Thay API_KEY_CUA_BAN bằng API Key thật của mình.
+
+
+4. NHẬP GOOGLE CLOUD PROJECT ID
+
+Nhập:
+
+$env:GOOGLE_CLOUD_PROJECT="PROJECT_ID_CUA_BAN"
+
+Ví dụ:
+
+$env:GOOGLE_CLOUD_PROJECT="ptit-ai-career"
+
+
+5. KIỂM TRA CÁC BIẾN MÔI TRƯỜNG
+
+Kiểm tra API Key:
+
+echo $env:GOOGLE_API_KEY
+
+Kiểm tra Project ID:
+
+echo $env:GOOGLE_CLOUD_PROJECT
+
+Nếu cả hai lệnh đều trả về giá trị thì các biến môi trường đã được thiết lập.
+
+LƯU Ý:
+- Không gửi API Key cho người khác.
+- Không commit API Key vào GitHub.
+- Các biến được thiết lập bằng $env:... chỉ có hiệu lực trong cửa sổ PowerShell hiện tại.
+- Khi mở PowerShell mới, cần thiết lập lại các biến.
+
+
+6. CHẠY AI ENGINE SERVICE
+
+Di chuyển vào thư mục service:
+
+cd ai-engine-service
+
+Chạy:
+
+.\mvnw.cmd spring-boot:run
+
+
+7. KIỂM TRA SERVICE
+
+Nếu chạy thành công, log sẽ xuất hiện dòng tương tự:
+
+Started AiEngineServiceApplication
+
+AI Engine Service chạy tại:
+
+http://localhost:8083
+
+
+8. KIỂM TRA ACTUATOR
+
+Mở trình duyệt:
+
+http://localhost:8083/actuator/health
+
+Hoặc PowerShell:
+
+curl http://localhost:8083/actuator/health
+
+Nếu service hoạt động bình thường, kết quả sẽ có:
+
+"status":"UP"
+
+
+9. KIỂM TRA RABBITMQ VÀ QDRANT
+
+Nếu sử dụng RabbitMQ và Qdrant, trước khi test đầy đủ AI Engine cần đảm bảo Docker Desktop đang chạy.
+
+Kiểm tra:
+
+docker ps
+
+Các service cần có:
+
+RabbitMQ:
+localhost:5672
+
+Qdrant:
+localhost:6334
+
+
+10. XỬ LÝ LỖI GOOGLE GENAI
+
+Nếu gặp lỗi:
+
+Google GenAI project-id must be set!
+
+Kiểm tra trước:
+
+echo $env:GOOGLE_API_KEY
+
+echo $env:GOOGLE_CLOUD_PROJECT
+
+Nếu GOOGLE_API_KEY đang trống, thiết lập lại:
+
+$env:GOOGLE_API_KEY="API_KEY_CUA_BAN"
+
+Sau đó chạy lại:
+
+.\mvnw.cmd spring-boot:run
+
+
+11. QUY TRÌNH CHẠY NHANH
+
+Mỗi khi mở terminal mới:
+
+cd D:\DATN\PTIT-AI-Career-Platform\ai-engine-service
+
+$env:GOOGLE_API_KEY="API_KEY_CUA_BAN"
+
+$env:GOOGLE_CLOUD_PROJECT="PROJECT_ID_CUA_BAN"
+
+echo $env:GOOGLE_API_KEY
+
+echo $env:GOOGLE_CLOUD_PROJECT
+
+.\mvnw.cmd spring-boot:run
+
+Sau khi thấy:
+
+Started AiEngineServiceApplication
+
+thì kiểm tra:
+
+http://localhost:8083/actuator/health
+
+
+12. BẢO MẬT
+
+KHÔNG ghi API Key trực tiếp vào:
+
+application.properties
+
+KHÔNG commit API Key lên GitHub.
+
+Mỗi thành viên trong nhóm cần tự thiết lập:
+
+GOOGLE_API_KEY
+
+trên máy của mình.
