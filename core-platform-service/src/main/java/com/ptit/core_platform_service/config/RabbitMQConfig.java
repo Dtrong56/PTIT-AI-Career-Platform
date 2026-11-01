@@ -1,94 +1,228 @@
 package com.ptit.core_platform_service.config;
 
-import org.springframework.amqp.core.Binding;
-import org.springframework.amqp.core.BindingBuilder;
-import org.springframework.amqp.core.DirectExchange;
-import org.springframework.amqp.core.Queue;
+import org.springframework.amqp.core.*;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 @Configuration
 public class RabbitMQConfig {
 
-    // ============================================================
-    // 1. EXCHANGE
-    // ============================================================
-    // Exchange là nơi nhận message từ Producer
-    // và quyết định message sẽ đi vào Queue nào.
-    //
-    // Có thể dùng chung một exchange cho toàn bộ hệ thống.
-    // ============================================================
+    public static final String EXCHANGE = "ptit.career.exchange";
 
-    public static final String EXCHANGE = "ptit.ai.exchange";
+    // =========================
+    // AI QUEUES
+    // =========================
 
-    // ============================================================
-    // 2. QUEUE
-    // ============================================================
-    // Queue nhận kết quả từ AI Engine.
-    //
-    // Ví dụ:
-    // AI Engine xử lý CV/JD xong
-    // ↓
-    // ptit.ai.exchange
-    // ↓
-    // ai.result
-    // ↓
-    // core.ai.result.queue
-    //
-    // Core Service sẽ consume queue này sau này.
-    // ============================================================
+    public static final String AI_CV_PREPROCESSING_QUEUE = "ai.cv.preprocessing.queue";
 
-    public static final String AI_RESULT_QUEUE = "core.ai.result.queue";
+    public static final String AI_JD_PREPROCESSING_QUEUE = "ai.jd.preprocessing.queue";
 
-    // ============================================================
-    // 3. ROUTING KEY
-    // ============================================================
-    // Routing key giúp Exchange xác định message
-    // sẽ được route tới Queue nào.
-    // ============================================================
+    public static final String AI_ANALYSIS_QUEUE = "ai.analysis.queue";
 
-    public static final String AI_RESULT_ROUTING_KEY = "ai.result";
+    // =========================
+    // CORE RESULT QUEUES
+    // =========================
 
-    // ============================================================
-    // 4. EXCHANGE BEAN
-    // ============================================================
+    public static final String CORE_CV_PREPROCESSING_RESULT_QUEUE = "core.cv.preprocessing.result.queue";
+
+    public static final String CORE_JD_PREPROCESSING_RESULT_QUEUE = "core.jd.preprocessing.result.queue";
+
+    public static final String CORE_ANALYSIS_RESULT_QUEUE = "core.analysis.result.queue";
+
+    // =========================
+    // DASHBOARD QUEUES
+    // =========================
+
+    public static final String DASHBOARD_CV_ADD_QUEUE = "dashboard.cv.add.queue";
+
+    public static final String DASHBOARD_JD_ADD_QUEUE = "dashboard.jd.add.queue";
+
+    public static final String DASHBOARD_ANALYSIS_RESULT_QUEUE = "dashboard.analysis.result.queue";
+
+    // =========================
+    // ROUTING KEYS
+    // =========================
+
+    public static final String CV_PREPROCESSING_REQUEST = "cv.preprocessing.request";
+
+    public static final String JD_PREPROCESSING_REQUEST = "jd.preprocessing.request";
+
+    public static final String CV_ANALYSIS_REQUEST = "cv.analysis.request";
+
+    public static final String CV_PREPROCESSING_COMPLETED = "cv.preprocessing.completed";
+
+    public static final String JD_PREPROCESSING_COMPLETED = "jd.preprocessing.completed";
+
+    public static final String CV_ANALYSIS_COMPLETED = "cv.analysis.completed";
+
+    public static final String CV_ADD_REQUEST = "cv.add.request";
+
+    public static final String JD_ADD_REQUEST = "jd.add.request";
+
+    public static final String CV_ANALYSIS_RESULT = "cv.analysis.result";
 
     @Bean
-    public DirectExchange aiExchange() {
+    public DirectExchange careerExchange() {
         return new DirectExchange(EXCHANGE);
     }
 
-    // ============================================================
-    // 5. QUEUE BEAN
-    // ============================================================
+    // =========================
+    // QUEUES
+    // =========================
 
     @Bean
-    public Queue aiResultQueue() {
-        return new Queue(AI_RESULT_QUEUE, true);
+    public Queue aiCvPreprocessingQueue() {
+        return new Queue(AI_CV_PREPROCESSING_QUEUE, true);
     }
 
-    // ============================================================
-    // 6. BINDING
-    // ============================================================
-    // Liên kết:
-    //
-    // Exchange
-    // +
-    // Routing Key
-    // ↓
-    // Queue
-    //
-    // Chưa cần viết Consumer ở bước này.
-    // ============================================================
+    @Bean
+    public Queue aiJdPreprocessingQueue() {
+        return new Queue(AI_JD_PREPROCESSING_QUEUE, true);
+    }
 
     @Bean
-    public Binding aiResultBinding(
-            Queue aiResultQueue,
-            DirectExchange aiExchange) {
+    public Queue aiAnalysisQueue() {
+        return new Queue(AI_ANALYSIS_QUEUE, true);
+    }
+
+    @Bean
+    public Queue coreCvPreprocessingResultQueue() {
+        return new Queue(CORE_CV_PREPROCESSING_RESULT_QUEUE, true);
+    }
+
+    @Bean
+    public Queue coreJdPreprocessingResultQueue() {
+        return new Queue(CORE_JD_PREPROCESSING_RESULT_QUEUE, true);
+    }
+
+    @Bean
+    public Queue coreAnalysisResultQueue() {
+        return new Queue(CORE_ANALYSIS_RESULT_QUEUE, true);
+    }
+
+    @Bean
+    public Queue dashboardCvAddQueue() {
+        return new Queue(DASHBOARD_CV_ADD_QUEUE, true);
+    }
+
+    @Bean
+    public Queue dashboardJdAddQueue() {
+        return new Queue(DASHBOARD_JD_ADD_QUEUE, true);
+    }
+
+    @Bean
+    public Queue dashboardAnalysisResultQueue() {
+        return new Queue(DASHBOARD_ANALYSIS_RESULT_QUEUE, true);
+    }
+
+    // =========================
+    // AI REQUEST BINDINGS
+    // =========================
+
+    @Bean
+    public Binding cvPreprocessingBinding(
+            Queue aiCvPreprocessingQueue,
+            DirectExchange careerExchange) {
 
         return BindingBuilder
-                .bind(aiResultQueue)
-                .to(aiExchange)
-                .with(AI_RESULT_ROUTING_KEY);
+                .bind(aiCvPreprocessingQueue)
+                .to(careerExchange)
+                .with(CV_PREPROCESSING_REQUEST);
+    }
+
+    @Bean
+    public Binding jdPreprocessingBinding(
+            Queue aiJdPreprocessingQueue,
+            DirectExchange careerExchange) {
+
+        return BindingBuilder
+                .bind(aiJdPreprocessingQueue)
+                .to(careerExchange)
+                .with(JD_PREPROCESSING_REQUEST);
+    }
+
+    @Bean
+    public Binding analysisBinding(
+            Queue aiAnalysisQueue,
+            DirectExchange careerExchange) {
+
+        return BindingBuilder
+                .bind(aiAnalysisQueue)
+                .to(careerExchange)
+                .with(CV_ANALYSIS_REQUEST);
+    }
+
+    // =========================
+    // CORE RESULT BINDINGS
+    // =========================
+
+    @Bean
+    public Binding cvPreprocessingResultBinding(
+            Queue coreCvPreprocessingResultQueue,
+            DirectExchange careerExchange) {
+
+        return BindingBuilder
+                .bind(coreCvPreprocessingResultQueue)
+                .to(careerExchange)
+                .with(CV_PREPROCESSING_COMPLETED);
+    }
+
+    @Bean
+    public Binding jdPreprocessingResultBinding(
+            Queue coreJdPreprocessingResultQueue,
+            DirectExchange careerExchange) {
+
+        return BindingBuilder
+                .bind(coreJdPreprocessingResultQueue)
+                .to(careerExchange)
+                .with(JD_PREPROCESSING_COMPLETED);
+    }
+
+    @Bean
+    public Binding analysisResultBinding(
+            Queue coreAnalysisResultQueue,
+            DirectExchange careerExchange) {
+
+        return BindingBuilder
+                .bind(coreAnalysisResultQueue)
+                .to(careerExchange)
+                .with(CV_ANALYSIS_COMPLETED);
+    }
+
+    // =========================
+    // DASHBOARD BINDINGS
+    // =========================
+
+    @Bean
+    public Binding dashboardCvAddBinding(
+            Queue dashboardCvAddQueue,
+            DirectExchange careerExchange) {
+
+        return BindingBuilder
+                .bind(dashboardCvAddQueue)
+                .to(careerExchange)
+                .with(CV_ADD_REQUEST);
+    }
+
+    @Bean
+    public Binding dashboardJdAddBinding(
+            Queue dashboardJdAddQueue,
+            DirectExchange careerExchange) {
+
+        return BindingBuilder
+                .bind(dashboardJdAddQueue)
+                .to(careerExchange)
+                .with(JD_ADD_REQUEST);
+    }
+
+    @Bean
+    public Binding dashboardAnalysisResultBinding(
+            Queue dashboardAnalysisResultQueue,
+            DirectExchange careerExchange) {
+
+        return BindingBuilder
+                .bind(dashboardAnalysisResultQueue)
+                .to(careerExchange)
+                .with(CV_ANALYSIS_RESULT);
     }
 }
