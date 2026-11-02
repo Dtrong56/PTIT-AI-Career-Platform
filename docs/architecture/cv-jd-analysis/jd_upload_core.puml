@@ -1,0 +1,61 @@
+@startuml
+title JD Creation & Preprocessing Sequence - Core Service
+
+actor Student
+
+participant "API Gateway" as Gateway
+participant "JDController" as Controller
+participant "JDServiceImpl" as Service
+participant "StudentRepository" as StudentRepo
+participant "JDRepository" as JDRepo
+participant "CoreMessageProducer" as Producer
+queue "RabbitMQ" as RabbitMQ
+participant "Dashboard Service" as Dashboard
+participant "AI Engine Service" as AI
+
+== Create JD ==
+
+Student -> Gateway: POST /api/core/jds\nCreateJDRequest
+Gateway -> Controller: Forward request
+
+Controller -> Service: createJD(request)
+
+== Validate Student ==
+
+Service -> StudentRepo: findById(studentId)
+StudentRepo --> Service: Student
+
+alt Student not found
+    Service --> Controller: Student not found
+    Controller --> Gateway: HTTP 404
+    Gateway --> Student: Error response
+else Student exists
+
+    == Create & Save JD ==
+
+    Service -> Service: Build JD entity\nstatus = PENDING
+    Service -> JDRepo: save(jd)
+    JDRepo --> Service: savedJD
+
+    == Notify Dashboard ==
+
+    Service -> Producer: sendJDAddRequest(\nJDAddRequest)
+    Producer -> RabbitMQ: Publish\nRouting Key: jd.add.request
+    RabbitMQ -> Dashboard: JDAddRequest
+    Dashboard --> RabbitMQ: ACK
+
+    == Request JD Preprocessing ==
+
+    Service -> Producer: sendJDPreprocessingRequest(\nJDPreprocessingRequest)
+    Producer -> RabbitMQ: Publish\nRouting Key: jd.preprocessing.request
+    RabbitMQ -> AI: JDPreprocessingRequest
+    AI --> RabbitMQ: ACK
+
+    == Return Response ==
+
+    Service --> Controller: JDResponse
+    Controller --> Gateway: HTTP 200
+    Gateway --> Student: JDResponse
+
+end
+@enduml

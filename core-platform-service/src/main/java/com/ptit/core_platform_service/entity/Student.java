@@ -30,4 +30,9 @@ public class Student {
     @OneToMany(mappedBy = "student")
     @Builder.Default
     private List<JD> jds = new ArrayList<>();
+
+    // methods
+    public UUID getId() {
+        return studentId;
+    }
 }

@@ -4,5 +4,8 @@ import java.util.UUID;
 
 public record CVPreprocessingRequest(
         UUID cvId,
-        String rawText) {
+        UUID studentId,
+        String fileName,
+        String contentType,
+        byte[] fileData) {
 }

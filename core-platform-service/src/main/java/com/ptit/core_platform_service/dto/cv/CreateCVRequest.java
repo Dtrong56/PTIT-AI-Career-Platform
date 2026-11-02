@@ -3,8 +3,5 @@ package com.ptit.core_platform_service.dto.cv;
 import java.util.UUID;
 
 public record CreateCVRequest(
-        UUID studentId,
-        String rawText,
-        UUID jdId
-) {
+        UUID studentId) {
 }

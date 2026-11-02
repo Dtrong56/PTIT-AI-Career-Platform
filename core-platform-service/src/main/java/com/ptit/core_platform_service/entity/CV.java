@@ -39,4 +39,9 @@ public class CV {
 
     @Column(nullable = false)
     private LocalDateTime updatedAt;
+
+    // methods
+    public UUID getId() {
+        return cvId;
+    }
 }

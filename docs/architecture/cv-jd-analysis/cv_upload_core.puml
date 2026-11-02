@@ -1,0 +1,179 @@
+@startuml
+title Core Platform Service - Sequence Diagram
+
+actor Student
+participant "API Gateway" as Gateway
+participant "CVController" as CVController
+participant "JDController" as JDController
+participant "AnalysisController" as AnalysisController
+
+participant "CVService" as CVService
+participant "JDService" as JDService
+participant "AnalysisService" as AnalysisService
+
+database "MySQL" as DB
+
+participant "CoreMessageProducer" as Producer
+queue "RabbitMQ" as MQ
+participant "CoreMessageConsumer" as Consumer
+
+participant "AI Engine Service" as AI
+participant "Dashboard Service" as Dashboard
+
+
+== 1. Upload & Preprocess CV ==
+
+Student -> Gateway : POST /api/core/cvs\nPDF + studentId
+Gateway -> CVController : uploadCV(studentId, file)
+
+CVController -> CVService : uploadCV(studentId, file)
+
+CVService -> CVService : Validate PDF file
+CVService -> DB : Find Student
+DB --> CVService : Student
+
+CVService -> DB : Save CV\nstatus = PENDING
+DB --> CVService : CV
+
+CVService -> Producer : sendCVPreprocessingRequest()
+Producer -> MQ : CV_PREPROCESSING_REQUEST\n(cvId, studentId, fileData)
+
+CVService -> DB : Update status = PROCESSING
+DB --> CVService : Updated CV
+
+CVService -> Producer : sendCVAddEvent()
+Producer -> MQ : CV_ADD_REQUEST\n(cvId, studentId)
+
+CVService --> CVController : CVResponse
+CVController --> Gateway : 200 OK\ncvId + PROCESSING
+Gateway --> Student : Upload successful
+
+
+== CV preprocessing - Async ==
+
+MQ -> AI : CV_PREPROCESSING_REQUEST
+AI -> AI : Extract text\nStructure CV\nNormalize data
+
+AI -> MQ : CV_PREPROCESSING_COMPLETED\n(cvId, rawText, structuredData)
+
+MQ -> Consumer : CV_PREPROCESSING_COMPLETED
+Consumer -> CVService : handlePreprocessingCompleted(result)
+
+CVService -> DB : Find CV
+DB --> CVService : CV
+
+alt Processing successful
+    CVService -> DB : Update rawText\nUpdate structuredContent\nstatus = COMPLETED
+else Processing failed
+    CVService -> DB : Update status = FAILED
+end
+
+CVService --> Consumer : Done
+
+
+== 2. Create & Preprocess JD ==
+
+Student -> Gateway : POST /api/core/jds\nJD content
+Gateway -> JDController : createJD(request)
+
+JDController -> JDService : createJD(request)
+
+JDService -> JDService : Validate JD
+JDService -> DB : Find Student
+DB --> JDService : Student
+
+JDService -> DB : Save JD\nstatus = PENDING
+DB --> JDService : JD
+
+JDService -> Producer : sendJDPreprocessingRequest()
+Producer -> MQ : JD_PREPROCESSING_REQUEST\n(jdId, studentId, content)
+
+JDService -> DB : Update status = PROCESSING
+
+JDService -> Producer : sendJDAddEvent()
+Producer -> MQ : JD_ADD_REQUEST\n(jdId, studentId)
+
+JDService --> JDController : JDResponse
+JDController --> Gateway : 200 OK\njdId + PROCESSING
+Gateway --> Student : JD created
+
+
+== JD preprocessing - Async ==
+
+MQ -> AI : JD_PREPROCESSING_REQUEST
+AI -> AI : Extract requirements\nStructure JD\nNormalize data
+
+AI -> MQ : JD_PREPROCESSING_COMPLETED\n(jdId, rawText, structuredData)
+
+MQ -> Consumer : JD_PREPROCESSING_COMPLETED
+Consumer -> JDService : handlePreprocessingCompleted(result)
+
+JDService -> DB : Find JD
+DB --> JDService : JD
+
+alt Processing successful
+    JDService -> DB : Update rawText\nUpdate structuredContent\nstatus = COMPLETED
+else Processing failed
+    JDService -> DB : Update status = FAILED
+end
+
+JDService --> Consumer : Done
+
+
+== 3. CV-JD Analysis ==
+
+Student -> Gateway : POST /api/core/analyses\ncvId + jdId
+Gateway -> AnalysisController : analyze(cvId, jdId)
+
+AnalysisController -> AnalysisService : analyze(cvId, jdId)
+
+AnalysisService -> DB : Check CV
+DB --> AnalysisService : CV
+
+AnalysisService -> DB : Check JD
+DB --> AnalysisService : JD
+
+AnalysisService -> DB : Create Analysis\nstatus = PENDING
+DB --> AnalysisService : Analysis
+
+AnalysisService -> Producer : sendAnalysisRequest()
+Producer -> MQ : CV_ANALYSIS_REQUEST\n(cvId, jdId, analysisId)
+
+AnalysisService --> AnalysisController : AnalysisResponse
+AnalysisController --> Gateway : 200 OK\nanalysisId + PENDING
+Gateway --> Student : Analysis started
+
+
+== Analysis - Async ==
+
+MQ -> AI : CV_ANALYSIS_REQUEST
+
+AI -> AI : Load normalized CV
+AI -> AI : Load normalized JD
+AI -> AI : Generate embeddings
+AI -> AI : Calculate cosine similarity
+AI -> AI : Match skills
+AI -> AI : Calculate Match Score
+AI -> AI : Calculate Skill Gap
+
+AI -> MQ : CV_ANALYSIS_COMPLETED\n(analysisId, matchScore,\nsemanticScore, skillScore, skillGap)
+
+MQ -> Consumer : CV_ANALYSIS_COMPLETED
+Consumer -> AnalysisService : handleAnalysisCompleted(result)
+
+AnalysisService -> DB : Find Analysis
+DB --> AnalysisService : Analysis
+
+AnalysisService -> DB : Update Analysis\nstatus = COMPLETED\nmatchScore\nsemanticScore\nskillScore
+
+AnalysisService -> DB : Save SkillGap
+
+AnalysisService -> Producer : sendAnalysisResult()
+Producer -> MQ : CV_ANALYSIS_RESULT\n(analysis result)
+
+MQ -> Dashboard : CV_ANALYSIS_RESULT
+
+AnalysisService --> Consumer : Done
+
+
+@enduml
