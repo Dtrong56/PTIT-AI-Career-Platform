@@ -1,13 +1,14 @@
 package com.ptit.core_platform_service.service.impl;
 
-import com.ptit.core_platform_service.messaging.CoreMessageProducer;
 import com.ptit.core_platform_service.dto.jd.CreateJDRequest;
 import com.ptit.core_platform_service.dto.jd.JDResponse;
 import com.ptit.core_platform_service.entity.JD;
 import com.ptit.core_platform_service.entity.Student;
 import com.ptit.core_platform_service.entity.enums.ProcessingStatus;
+import com.ptit.core_platform_service.messaging.CoreMessageProducer;
 import com.ptit.core_platform_service.messaging.JDAddRequest;
 import com.ptit.core_platform_service.messaging.JDPreprocessingRequest;
+import com.ptit.core_platform_service.messaging.JDPreprocessingResult;
 import com.ptit.core_platform_service.repository.JDRepository;
 import com.ptit.core_platform_service.repository.StudentRepository;
 import com.ptit.core_platform_service.service.JDService;
@@ -23,106 +24,149 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class JDServiceImpl implements JDService {
 
-    private final JDRepository jdRepository;
-    private final StudentRepository studentRepository;
-    private final CoreMessageProducer coreMessageProducer;
+        private final JDRepository jdRepository;
+        private final StudentRepository studentRepository;
+        private final CoreMessageProducer coreMessageProducer;
 
-    /**
-     * Tạo Job Description mới.
-     *
-     * Flow:
-     * 1. Kiểm tra student tồn tại.
-     * 2. Tạo JD entity.
-     * 3. Lưu JD vào Core Database.
-     * 4. Gửi JD_ADD_REQUEST cho Dashboard.
-     * 5. Gửi JD_PREPROCESSING_REQUEST cho AI Engine.
-     * 6. Trả về JDResponse với trạng thái PENDING.
-     */
-    @Override
-    @Transactional
-    public JDResponse createJD(CreateJDRequest request) {
+        /**
+         * Tạo Job Description mới.
+         *
+         * Flow:
+         * 1. Kiểm tra student tồn tại.
+         * 2. Tạo JD entity với trạng thái PENDING.
+         * 3. Lưu JD vào Core Database.
+         * 4. Gửi JD_ADD_REQUEST cho Dashboard.
+         * 5. Gửi JD_PREPROCESSING_REQUEST cho AI Engine.
+         * 6. Trả về JDResponse.
+         */
+        @Override
+        @Transactional
+        public JDResponse createJD(CreateJDRequest request) {
 
-        // 1. Kiểm tra student tồn tại
-        Student student = studentRepository.findById(request.studentId())
-                .orElseThrow(() -> new RuntimeException("Student not found"));
+                // 1. Kiểm tra student tồn tại
+                Student student = studentRepository.findById(request.studentId())
+                                .orElseThrow(() -> new RuntimeException("Student not found"));
 
-        // 2. Tạo JD entity
-        JD jd = JD.builder()
-                .student(student)
-                .title(request.title())
-                .rawContent(request.rawContent())
-                .status(ProcessingStatus.PENDING)
-                .createdAt(LocalDateTime.now())
-                .updatedAt(LocalDateTime.now())
-                .build();
+                // 2. Tạo JD entity
+                JD jd = JD.builder()
+                                .student(student)
+                                .title(request.title())
+                                .rawContent(request.rawContent())
+                                .status(ProcessingStatus.PENDING)
+                                .createdAt(LocalDateTime.now())
+                                .updatedAt(LocalDateTime.now())
+                                .build();
 
-        // 3. Lưu JD
-        JD savedJD = jdRepository.save(jd);
+                // 3. Lưu JD
+                JD savedJD = jdRepository.save(jd);
 
-        // 4. Gửi thông báo JD được thêm vào Dashboard
-        coreMessageProducer.sendJDAddEvent(
-                new JDAddRequest(
-                        savedJD.getJdId(),
-                        student.getStudentId()));
+                // 4. Thông báo cho Dashboard rằng JD mới đã được tạo
+                coreMessageProducer.sendJDAddEvent(
+                                new JDAddRequest(
+                                                savedJD.getJdId(),
+                                                student.getStudentId()));
 
-        // 5. Gửi JD sang AI Engine để preprocessing
-        coreMessageProducer.sendJDPreprocessingRequest(
-                new JDPreprocessingRequest(
-                        savedJD.getJdId(),
-                        savedJD.getRawContent()));
+                // 5. Gửi JD sang AI Engine để preprocessing
+                coreMessageProducer.sendJDPreprocessingRequest(
+                                new JDPreprocessingRequest(
+                                                savedJD.getJdId(),
+                                                savedJD.getRawContent()));
 
-        // 6. Trả response
-        return new JDResponse(
-                savedJD.getJdId(),
-                student.getStudentId(),
-                savedJD.getTitle(),
-                savedJD.getStatus(),
-                savedJD.getCreatedAt(),
-                savedJD.getUpdatedAt());
-    }
+                // 6. Trả response với status = PENDING
+                return toResponse(savedJD);
+        }
 
-    /**
-     * Lấy danh sách JD của sinh viên.
-     */
-    @Override
-    @Transactional(readOnly = true)
-    public List<JDResponse> getJDs(UUID studentId) {
+        /**
+         * Xử lý kết quả preprocessing JD từ AI Engine.
+         *
+         * Flow:
+         * 1. Tìm JD theo jdId.
+         * 2. Kiểm tra kết quả preprocessing.
+         * 3. Nếu thất bại:
+         * - cập nhật status = FAILED.
+         * - có thể xử lý errorMessage.
+         * 4. Nếu thành công:
+         * - cập nhật structuredContent.
+         * - cập nhật status = COMPLETED.
+         * 5. Cập nhật updatedAt.
+         * 6. Lưu JD.
+         */
+        @Override
+        @Transactional
+        public void handlePreprocessingCompleted(
+                        JDPreprocessingResult result) {
 
-        // TODO:
-        // 1. Kiểm tra student tồn tại.
-        // 2. Query JD theo studentId.
-        // 3. Mapping Entity -> Response.
+                // 1. Tìm JD
+                JD jd = jdRepository.findById(result.jdId())
+                                .orElseThrow(() -> new RuntimeException(
+                                                "JD not found: " + result.jdId()));
 
-        return jdRepository.findByStudentStudentId(studentId)
-                .stream()
-                .map(this::toResponse)
-                .toList();
-    }
+                // 2. Kiểm tra kết quả preprocessing
+                if (!result.success()) {
 
-    /**
-     * Lấy thông tin một JD.
-     */
-    @Override
-    @Transactional(readOnly = true)
-    public JDResponse getJD(UUID jdId) {
+                        // 3. Preprocessing thất bại
+                        jd.setStatus(ProcessingStatus.FAILED);
+                        jd.setUpdatedAt(LocalDateTime.now());
 
-        JD jd = jdRepository.findById(jdId)
-                .orElseThrow(() -> new RuntimeException("JD not found: " + jdId));
+                        // TODO:
+                        // Nếu entity JD sau này có errorMessage
+                        // thì lưu result.errorMessage() tại đây.
 
-        return toResponse(jd);
-    }
+                        jdRepository.save(jd);
+                        return;
+                }
 
-    /**
-     * Mapping JD entity sang JDResponse.
-     */
-    private JDResponse toResponse(JD jd) {
+                // 4. Preprocessing thành công
+                jd.setStructuredContent(result.structuredContent());
+                jd.setStatus(ProcessingStatus.COMPLETED);
+                jd.setUpdatedAt(LocalDateTime.now());
 
-        return new JDResponse(
-                jd.getJdId(),
-                jd.getStudent().getStudentId(),
-                jd.getTitle(),
-                jd.getStatus(),
-                jd.getCreatedAt(),
-                jd.getUpdatedAt());
-    }
+                // 5. Lưu JD
+                jdRepository.save(jd);
+        }
+
+        /**
+         * Lấy danh sách JD của sinh viên.
+         */
+        @Override
+        @Transactional(readOnly = true)
+        public List<JDResponse> getJDs(UUID studentId) {
+
+                // TODO:
+                // 1. Kiểm tra student tồn tại nếu cần.
+                // 2. Query JD theo studentId.
+                // 3. Mapping Entity -> Response.
+
+                return jdRepository.findByStudentStudentId(studentId)
+                                .stream()
+                                .map(this::toResponse)
+                                .toList();
+        }
+
+        /**
+         * Lấy thông tin một JD.
+         */
+        @Override
+        @Transactional(readOnly = true)
+        public JDResponse getJD(UUID jdId) {
+
+                JD jd = jdRepository.findById(jdId)
+                                .orElseThrow(() -> new RuntimeException("JD not found: " + jdId));
+
+                return toResponse(jd);
+        }
+
+        /**
+         * Mapping JD entity sang JDResponse.
+         */
+        private JDResponse toResponse(JD jd) {
+
+                return new JDResponse(
+                                jd.getJdId(),
+                                jd.getStudent().getStudentId(),
+                                jd.getTitle(),
+                                jd.getStatus(),
+                                jd.getCreatedAt(),
+                                jd.getUpdatedAt());
+        }
 }
