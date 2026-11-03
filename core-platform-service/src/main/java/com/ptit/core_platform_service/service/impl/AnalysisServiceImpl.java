@@ -2,11 +2,27 @@ package com.ptit.core_platform_service.service.impl;
 
 import com.ptit.core_platform_service.dto.analysis.AnalysisResponse;
 import com.ptit.core_platform_service.dto.analysis.CreateAnalysisRequest;
+import com.ptit.core_platform_service.dto.analysis.SkillGapResponse;
+import com.ptit.core_platform_service.entity.Analysis;
+import com.ptit.core_platform_service.entity.CV;
+import com.ptit.core_platform_service.entity.JD;
+import com.ptit.core_platform_service.entity.SkillGap;
 import com.ptit.core_platform_service.entity.enums.AnalysisStatus;
+import com.ptit.core_platform_service.entity.enums.ProcessingStatus;
+import com.ptit.core_platform_service.messaging.CVAnalysisRequest;
+import com.ptit.core_platform_service.messaging.CVAnalysisResult;
+import com.ptit.core_platform_service.messaging.CoreMessageProducer;
+import com.ptit.core_platform_service.messaging.SkillGapResult;
+import com.ptit.core_platform_service.repository.AnalysisRepository;
+import com.ptit.core_platform_service.repository.CVRepository;
+import com.ptit.core_platform_service.repository.JDRepository;
 import com.ptit.core_platform_service.service.AnalysisService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
@@ -14,80 +30,306 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class AnalysisServiceImpl implements AnalysisService {
 
+    private final AnalysisRepository analysisRepository;
+    private final CVRepository cvRepository;
+    private final JDRepository jdRepository;
+    private final CoreMessageProducer messageProducer;
+
     /**
      * Tạo yêu cầu phân tích CV - JD.
      *
      * Flow:
-     * 1. Validate CV.
-     * 2. Validate JD.
+     * 1. Tìm CV.
+     * 2. Tìm JD.
      * 3. Kiểm tra CV/JD đã preprocessing COMPLETED.
-     * 4. Tạo Analysis với status = PENDING.
-     * 5. Lưu Analysis vào Core DB.
-     * 6. Publish CV_ANALYSIS_REQUEST -> RabbitMQ -> AI Engine.
-     * 7. Trả về AnalysisResponse.
+     * 4. Tạo Analysis = PENDING.
+     * 5. Lưu Analysis.
+     * 6. Gửi CVAnalysisRequest sang AI Engine.
+     * 7. Trả response PENDING cho frontend.
      */
     @Override
-    public AnalysisResponse createAnalysis(CreateAnalysisRequest request) {
+    @Transactional
+    public AnalysisResponse createAnalysis(
+            CreateAnalysisRequest request) {
 
-        // TODO 1: Tìm CV theo cvId
-        // TODO 2: Nếu CV không tồn tại -> throw exception
+        // ==========================================
+        // 1. Tìm CV
+        // ==========================================
 
-        // TODO 3: Tìm JD theo jdId
-        // TODO 4: Nếu JD không tồn tại -> throw exception
+        CV cv = cvRepository.findById(request.cvId())
+                .orElseThrow(() -> new RuntimeException(
+                        "CV not found: " + request.cvId()));
 
-        // TODO 5: Kiểm tra CV status = COMPLETED
-        // TODO 6: Kiểm tra JD status = COMPLETED
+        // ==========================================
+        // 2. Tìm JD
+        // ==========================================
 
-        // TODO 7: Tạo Analysis entity
-        // TODO 8: Set status = PENDING
-        // TODO 9: Lưu Analysis vào database
+        JD jd = jdRepository.findById(request.jdId())
+                .orElseThrow(() -> new RuntimeException(
+                        "JD not found: " + request.jdId()));
 
-        // TODO 10: Tạo CVAnalysisRequest
-        // TODO 11: Publish CV_ANALYSIS_REQUEST -> RabbitMQ -> AI Engine
+        // ==========================================
+        // 3. Kiểm tra preprocessing
+        // ==========================================
 
-        // TODO 12: Mapping Analysis entity -> AnalysisResponse
+        if (cv.getStatus() != ProcessingStatus.COMPLETED) {
+            throw new IllegalStateException(
+                    "CV has not completed preprocessing");
+        }
 
-        return null;
+        if (jd.getStatus() != ProcessingStatus.COMPLETED) {
+            throw new IllegalStateException(
+                    "JD has not completed preprocessing");
+        }
+
+        // ==========================================
+        // 4. Tạo Analysis
+        // ==========================================
+
+        Analysis analysis = Analysis.builder()
+                .cv(cv)
+                .jd(jd)
+                .status(AnalysisStatus.PENDING)
+                .createdAt(LocalDateTime.now())
+                .build();
+
+        // ==========================================
+        // 5. Lưu Analysis trước
+        // ==========================================
+
+        analysis = analysisRepository.save(analysis);
+
+        // ==========================================
+        // 6. Gửi request sang AI Engine
+        // ==========================================
+
+        CVAnalysisRequest analysisRequest = new CVAnalysisRequest(
+                analysis.getAnalysisId(),
+                cv.getCvId(),
+                jd.getJdId());
+
+        messageProducer.sendAnalysisRequest(
+                analysisRequest);
+
+        // ==========================================
+        // 7. Trả response PENDING
+        // ==========================================
+
+        return toResponse(analysis);
     }
 
     /**
-     * Lấy danh sách kết quả phân tích của sinh viên.
+     * Lấy lịch sử phân tích của sinh viên.
      */
     @Override
-    public List<AnalysisResponse> getAnalyses(UUID studentId) {
+    @Transactional(readOnly = true)
+    public List<AnalysisResponse> getAnalyses(
+            UUID studentId) {
 
-        // TODO 1: Validate studentId
-        // TODO 2: Tìm các Analysis liên quan đến CV/JD của student
-        // TODO 3: Lấy SkillGap tương ứng
-        // TODO 4: Mapping List<Analysis> -> List<AnalysisResponse>
+        if (studentId == null) {
+            throw new IllegalArgumentException(
+                    "studentId must not be null");
+        }
 
-        return null;
+        List<Analysis> analyses = analysisRepository.findByStudentId(studentId);
+
+        return analyses.stream()
+                .map(this::toResponse)
+                .toList();
     }
 
     /**
-     * Lấy chi tiết một Analysis.
+     * Lấy chi tiết Analysis.
      */
     @Override
-    public AnalysisResponse getAnalysis(UUID analysisId) {
+    @Transactional(readOnly = true)
+    public AnalysisResponse getAnalysis(
+            UUID analysisId) {
 
-        // TODO 1: Tìm Analysis theo analysisId
-        // TODO 2: Nếu không tồn tại -> throw exception
-        // TODO 3: Lấy danh sách SkillGap
-        // TODO 4: Mapping Analysis + SkillGap -> AnalysisResponse
+        Analysis analysis = analysisRepository.findById(analysisId)
+                .orElseThrow(() -> new RuntimeException(
+                        "Analysis not found: "
+                                + analysisId));
 
-        return null;
+        return toResponse(analysis);
     }
 
     /**
-     * Lấy trạng thái xử lý của Analysis.
+     * Lấy trạng thái Analysis.
      */
     @Override
-    public AnalysisStatus getAnalysisStatus(UUID analysisId) {
+    @Transactional(readOnly = true)
+    public AnalysisStatus getAnalysisStatus(
+            UUID analysisId) {
 
-        // TODO 1: Tìm Analysis theo analysisId
-        // TODO 2: Nếu không tồn tại -> throw exception
-        // TODO 3: Trả về AnalysisStatus
+        Analysis analysis = analysisRepository.findById(analysisId)
+                .orElseThrow(() -> new RuntimeException(
+                        "Analysis not found: "
+                                + analysisId));
 
-        return null;
+        return analysis.getStatus();
+    }
+
+    /**
+     * Xử lý kết quả phân tích từ AI Engine.
+     *
+     * Flow:
+     *
+     * AI Engine
+     * ↓
+     * RabbitMQ
+     * ↓
+     * CoreMessageConsumer
+     * ↓
+     * handleAnalysisCompleted()
+     * ↓
+     * Tìm Analysis
+     * ↓
+     * Nếu FAILED -> Analysis = FAILED
+     * ↓
+     * Nếu SUCCESS:
+     * - lưu matchScore
+     * - lưu semanticScore
+     * - lưu skillScore
+     * - lưu SkillGap
+     * - Analysis = COMPLETED
+     * ↓
+     * Publish kết quả sang Dashboard
+     */
+    @Override
+    @Transactional
+    public void handleAnalysisCompleted(
+            CVAnalysisResult result) {
+
+        // ==========================================
+        // 1. Tìm Analysis
+        // ==========================================
+
+        Analysis analysis = analysisRepository.findById(result.analysisId())
+                .orElseThrow(() -> new RuntimeException(
+                        "Analysis not found: "
+                                + result.analysisId()));
+
+        // ==========================================
+        // 2. Kiểm tra kết quả từ AI Engine
+        // ==========================================
+
+        if (!Boolean.TRUE.equals(result.success())) {
+
+            analysis.setStatus(
+                    AnalysisStatus.FAILED);
+
+            analysisRepository.save(analysis);
+
+            // Không publish kết quả thành công
+            // sang Dashboard.
+            return;
+        }
+
+        // ==========================================
+        // 3. Cập nhật các score
+        // ==========================================
+
+        analysis.setMatchScore(
+                result.matchScore());
+
+        analysis.setSemanticScore(
+                result.semanticScore());
+
+        analysis.setSkillScore(
+                result.skillScore());
+
+        // ==========================================
+        // 4. Xóa SkillGap cũ nếu có
+        // ==========================================
+
+        analysis.getSkillGaps().clear();
+
+        // ==========================================
+        // 5. Lưu SkillGap từ AI Engine
+        // ==========================================
+
+        if (result.skillGaps() != null) {
+
+            for (SkillGapResult gapResult : result.skillGaps()) {
+
+                SkillGap skillGap = SkillGap.builder()
+                        .analysis(analysis)
+                        .skillName(gapResult.skillName())
+                        .type(gapResult.type())
+                        .matchStatus(gapResult.matchStatus())
+                        .score(gapResult.score())
+                        .evidence(gapResult.evidence())
+                        .build();
+
+                analysis.getSkillGaps()
+                        .add(skillGap);
+            }
+        }
+
+        // ==========================================
+        // 6. Cập nhật trạng thái COMPLETED
+        // ==========================================
+
+        analysis.setStatus(
+                AnalysisStatus.COMPLETED);
+
+        analysis.setCompletedAt(
+                LocalDateTime.now());
+
+        // ==========================================
+        // 7. Lưu toàn bộ Analysis + SkillGap
+        // ==========================================
+
+        analysis = analysisRepository.save(analysis);
+
+        // ==========================================
+        // 8. Gửi kết quả đã được Core xử lý
+        // sang Dashboard
+        // ==========================================
+
+        messageProducer.sendAnalysisResult(
+                toResponse(analysis));
+    }
+
+    /**
+     * Mapping Analysis Entity -> AnalysisResponse.
+     */
+    private AnalysisResponse toResponse(
+            Analysis analysis) {
+
+        List<SkillGapResponse> skillGaps = analysis.getSkillGaps() == null
+                ? Collections.emptyList()
+                : analysis.getSkillGaps()
+                        .stream()
+                        .map(this::toSkillGapResponse)
+                        .toList();
+
+        return new AnalysisResponse(
+                analysis.getAnalysisId(),
+                analysis.getCv().getCvId(),
+                analysis.getJd().getJdId(),
+                analysis.getStatus(),
+                analysis.getMatchScore(),
+                analysis.getSemanticScore(),
+                analysis.getSkillScore(),
+                analysis.getCreatedAt(),
+                analysis.getCompletedAt(),
+                skillGaps);
+    }
+
+    /**
+     * Mapping SkillGap Entity -> SkillGapResponse.
+     */
+    private SkillGapResponse toSkillGapResponse(
+            SkillGap skillGap) {
+
+        return new SkillGapResponse(
+                skillGap.getSkillGapId(),
+                skillGap.getSkillName(),
+                skillGap.getType(),
+                skillGap.getMatchStatus(),
+                skillGap.getScore(),
+                skillGap.getEvidence());
     }
 }

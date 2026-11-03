@@ -1,6 +1,7 @@
 package com.ptit.core_platform_service.messaging;
 
 import com.ptit.core_platform_service.config.RabbitMQConfig;
+import com.ptit.core_platform_service.service.AnalysisService;
 import com.ptit.core_platform_service.service.CVService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
@@ -11,6 +12,7 @@ import org.springframework.stereotype.Component;
 public class CoreMessageConsumer {
 
     private final CVService cvService;
+    private final AnalysisService analysisService;
 
     // =========================
     // CV PREPROCESSING RESULT
@@ -42,14 +44,21 @@ public class CoreMessageConsumer {
     public void consumeAnalysisResult(
             CVAnalysisResult result) {
 
-        // TODO:
-        // 1. Tìm Analysis theo analysisId
-        // 2. Kiểm tra result
-        // 3. Cập nhật status
-        // 4. Cập nhật matchScore
-        // 5. Cập nhật semanticScore
-        // 6. Cập nhật skillScore
-        // 7. Lưu SkillGap
-        // 8. Publish CV_ANALYSIS_RESULT -> Dashboard
+        /*
+         * Flow:
+         *
+         * AI Engine
+         * ↓
+         * RabbitMQ
+         * ↓
+         * Consumer
+         * ↓
+         * AnalysisService
+         *
+         * Consumer KHÔNG tự xử lý database.
+         * Business logic nằm trong AnalysisService.
+         */
+
+        analysisService.handleAnalysisCompleted(result);
     }
 }

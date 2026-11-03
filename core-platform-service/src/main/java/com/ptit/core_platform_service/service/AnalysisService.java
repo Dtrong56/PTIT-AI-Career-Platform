@@ -3,6 +3,7 @@ package com.ptit.core_platform_service.service;
 import com.ptit.core_platform_service.dto.analysis.AnalysisResponse;
 import com.ptit.core_platform_service.dto.analysis.CreateAnalysisRequest;
 import com.ptit.core_platform_service.entity.enums.AnalysisStatus;
+import com.ptit.core_platform_service.messaging.CVAnalysisResult;
 
 import java.util.List;
 import java.util.UUID;
@@ -25,33 +26,29 @@ public interface AnalysisService {
 
     /**
      * Lấy danh sách kết quả phân tích của một sinh viên.
-     *
-     * Flow:
-     * 1. Validate studentId.
-     * 2. Query các Analysis liên quan đến CV/JD của student.
-     * 3. Mapping Entity -> AnalysisResponse.
-     * 4. Bao gồm Match Score và Skill Gap nếu đã hoàn thành.
      */
     List<AnalysisResponse> getAnalyses(UUID studentId);
 
     /**
      * Lấy chi tiết một kết quả phân tích.
-     *
-     * Flow:
-     * 1. Tìm Analysis theo analysisId.
-     * 2. Nếu không tồn tại -> throw exception.
-     * 3. Lấy danh sách SkillGap của Analysis.
-     * 4. Mapping Entity -> AnalysisResponse.
      */
     AnalysisResponse getAnalysis(UUID analysisId);
 
     /**
      * Lấy trạng thái xử lý của một Analysis.
-     *
-     * Flow:
-     * 1. Tìm Analysis theo analysisId.
-     * 2. Nếu không tồn tại -> throw exception.
-     * 3. Trả về AnalysisStatus hiện tại.
      */
     AnalysisStatus getAnalysisStatus(UUID analysisId);
+
+    /**
+     * Xử lý kết quả phân tích trả về từ AI Engine.
+     *
+     * Flow:
+     * RabbitMQ
+     * -> CoreMessageConsumer
+     * -> AnalysisService
+     * -> cập nhật Analysis
+     * -> lưu SkillGap
+     * -> publish kết quả sang Dashboard
+     */
+    void handleAnalysisCompleted(CVAnalysisResult result);
 }
