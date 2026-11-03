@@ -1,0 +1,160 @@
+@startuml
+title CV-JD Analysis Flow - Core Platform Service
+
+autonumber
+
+actor Frontend
+
+participant "AnalysisController" as Controller
+participant "AnalysisService" as Service
+participant "CVRepository" as CVRepo
+participant "JDRepository" as JDRepo
+participant "AnalysisRepository" as AnalysisRepo
+participant "CoreMessageProducer" as Producer
+queue "RabbitMQ" as Rabbit
+participant "AI Engine Service" as AI
+participant "CoreMessageConsumer" as Consumer
+participant "Dashboard Service" as Dashboard
+
+== 1. Create CV-JD Analysis ==
+
+Frontend -> Controller: POST /api/core/analyses\nCreateAnalysisRequest(cvId, jdId)
+
+Controller -> Service: createAnalysis(request)
+
+Service -> CVRepo: findById(cvId)
+CVRepo --> Service: CV
+
+Service -> JDRepo: findById(jdId)
+JDRepo --> Service: JD
+
+== 2. Validate CV & JD ==
+
+Service -> Service: Validate CV exists
+Service -> Service: Validate JD exists
+
+Service -> Service: Check CV.status == COMPLETED
+Service -> Service: Check JD.status == COMPLETED
+
+alt CV/JD not found
+    Service --> Controller: Throw ResourceNotFoundException
+    Controller --> Frontend: HTTP 404
+else CV/JD not preprocessing completed
+    Service --> Controller: Throw InvalidStateException
+    Controller --> Frontend: HTTP 400
+else CV & JD valid
+    == 3. Create Analysis ==
+
+    Service -> Service: Create Analysis entity
+    Service -> Service: status = PENDING
+    Service -> Service: createdAt = now()
+
+    Service -> AnalysisRepo: save(analysis)
+    AnalysisRepo --> Service: Analysis(PENDING)
+
+    == 4. Send Analysis Request to AI Engine ==
+
+    Service -> Service: Create CVAnalysisRequest\n(analysisId, cvId, jdId)
+
+    Service -> Producer: sendAnalysisRequest(request)
+
+    Producer -> Rabbit: Publish CV_ANALYSIS_REQUEST
+
+    Rabbit -> AI: CVAnalysisRequest
+
+    == 5. Return Initial Response ==
+
+    Service -> Service: Map Analysis -> AnalysisResponse
+
+    Service --> Controller: AnalysisResponse(PENDING)
+    Controller --> Frontend: HTTP 200\nAnalysisResponse
+
+end
+
+== 6. AI Engine Processing ==
+
+AI -> AI: Load CV structured data
+AI -> AI: Load JD structured data
+AI -> AI: Calculate semantic similarity
+AI -> AI: Calculate skill matching
+AI -> AI: Detect skill gaps
+AI -> AI: Calculate matchScore
+AI -> AI: Calculate semanticScore
+AI -> AI: Calculate skillScore
+
+AI -> Rabbit: Publish CVAnalysisResult
+
+note right of Rabbit
+CVAnalysisResult:
+- analysisId
+- success
+- matchScore
+- semanticScore
+- skillScore
+- skillGaps
+- errorMessage
+end note
+
+== 7. Core Receives Analysis Result ==
+
+Rabbit -> Consumer: CVAnalysisResult
+
+Consumer -> Service: handleAnalysisCompleted(result)
+
+Service -> AnalysisRepo: findById(analysisId)
+AnalysisRepo --> Service: Analysis
+
+alt Analysis not found
+    Service -> Service: Throw ResourceNotFoundException
+
+else AI processing failed
+
+    Service -> Service: status = FAILED
+    Service -> Service: Set error state
+
+    Service -> AnalysisRepo: save(analysis)
+    AnalysisRepo --> Service: Analysis(FAILED)
+
+else AI processing successful
+
+    == 8. Update Analysis Result ==
+
+    Service -> Service: Set matchScore
+    Service -> Service: Set semanticScore
+    Service -> Service: Set skillScore
+
+    == 9. Save Skill Gaps ==
+
+    Service -> Service: Clear existing skillGaps
+
+    loop For each SkillGapResult
+        Service -> Service: Create SkillGap
+        Service -> Service: Set skillName
+        Service -> Service: Set type
+        Service -> Service: Set matchStatus
+        Service -> Service: Set score
+        Service -> Service: Set evidence
+        Service -> Service: Add SkillGap to Analysis
+    end
+
+    == 10. Complete Analysis ==
+
+    Service -> Service: status = COMPLETED
+    Service -> Service: completedAt = now()
+
+    Service -> AnalysisRepo: save(analysis)
+    AnalysisRepo --> Service: Analysis(COMPLETED)
+
+    == 11. Publish Standardized Result ==
+
+    Service -> Service: Map Analysis -> AnalysisResponse
+
+    Service -> Producer: sendAnalysisResult(AnalysisResponse)
+
+    Producer -> Rabbit: Publish CV_ANALYSIS_RESULT
+
+    Rabbit -> Dashboard: AnalysisResponse
+
+end
+
+@enduml
