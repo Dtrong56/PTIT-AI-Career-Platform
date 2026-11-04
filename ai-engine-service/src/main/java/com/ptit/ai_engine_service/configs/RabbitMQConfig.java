@@ -1,151 +1,101 @@
 package com.ptit.ai_engine_service.configs;
 
-// import org.springframework.amqp.core.Binding;
-// import org.springframework.amqp.core.BindingBuilder;
-// import org.springframework.amqp.core.DirectExchange;
-// import org.springframework.amqp.core.Queue;
-// import org.springframework.context.annotation.Bean;
-// import org.springframework.context.annotation.Configuration;
-
-// @Configuration
-// public class RabbitMQConfig {
-
-//     public static final String AI_EXCHANGE = "ai.exchange";
-
-//     public static final String CV_ANALYSIS_QUEUE = "ai.cv.analysis.queue";
-
-//     public static final String AI_RESULT_QUEUE = "ai.result.queue";
-
-//     public static final String CV_ANALYSIS_ROUTING_KEY = "ai.cv.analyze";
-
-//     public static final String AI_RESULT_ROUTING_KEY = "ai.result";
-
-//     @Bean
-//     public DirectExchange aiExchange() {
-//         return new DirectExchange(AI_EXCHANGE);
-//     }
-
-//     @Bean
-//     public Queue cvAnalysisQueue() {
-//         return new Queue(CV_ANALYSIS_QUEUE, true);
-//     }
-
-//     @Bean
-//     public Queue aiResultQueue() {
-//         return new Queue(AI_RESULT_QUEUE, true);
-//     }
-
-//     @Bean
-//     public Binding cvAnalysisBinding(
-//             Queue cvAnalysisQueue,
-//             DirectExchange aiExchange) {
-
-//         return BindingBuilder
-//                 .bind(cvAnalysisQueue)
-//                 .to(aiExchange)
-//                 .with(CV_ANALYSIS_ROUTING_KEY);
-//     }
-
-//     @Bean
-//     public Binding aiResultBinding(
-//             Queue aiResultQueue,
-//             DirectExchange aiExchange) {
-
-//         return BindingBuilder
-//                 .bind(aiResultQueue)
-//                 .to(aiExchange)
-//                 .with(AI_RESULT_ROUTING_KEY);
-//     }
-// }
-
+import com.ptit.ai_engine_service.messaging.event.RoutingKeys;
 import org.springframework.amqp.core.Binding;
 import org.springframework.amqp.core.BindingBuilder;
 import org.springframework.amqp.core.DirectExchange;
 import org.springframework.amqp.core.Queue;
+import org.springframework.amqp.core.QueueBuilder;
+import org.springframework.amqp.rabbit.annotation.EnableRabbit;
+import org.springframework.amqp.support.converter.JacksonJsonMessageConverter;
+import org.springframework.amqp.support.converter.MessageConverter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.beans.factory.annotation.Qualifier;
 
 @Configuration
+@EnableRabbit
 public class RabbitMQConfig {
 
-    // ============================================================
-    // 1. EXCHANGE
-    // ============================================================
+    public static final String EXCHANGE = "ptit.career.exchange";
 
-    public static final String EXCHANGE = "ptit.ai.exchange";
+    // =========================
+    // AI REQUEST QUEUES
+    // =========================
 
-    // ============================================================
-    // 2. QUEUES
-    // ============================================================
+    public static final String AI_CV_PREPROCESSING_QUEUE = "ai.cv.preprocessing.queue";
 
-    // Nhận job phân tích CV/JD từ Core Service
+    public static final String AI_JD_PREPROCESSING_QUEUE = "ai.jd.preprocessing.queue";
+
     public static final String AI_ANALYSIS_QUEUE = "ai.analysis.queue";
 
-    // Sau này có thể dùng cho các job Interview
-    public static final String AI_INTERVIEW_QUEUE = "ai.interview.queue";
-
-    // ============================================================
-    // 3. ROUTING KEYS
-    // ============================================================
-
-    public static final String AI_ANALYSIS_ROUTING_KEY = "ai.analysis";
-
-    public static final String AI_INTERVIEW_ROUTING_KEY = "ai.interview";
-
-    // ============================================================
-    // 4. EXCHANGE
-    // ============================================================
-
     @Bean
-    public DirectExchange aiExchange() {
-        return new DirectExchange(EXCHANGE);
+    public DirectExchange careerExchange() {
+        return new DirectExchange(EXCHANGE, true, false);
     }
 
-    // ============================================================
-    // 5. QUEUE - AI ANALYSIS
-    // ============================================================
+    // =========================
+    // QUEUES
+    // =========================
+
+    @Bean
+    public Queue aiCvPreprocessingQueue() {
+        return QueueBuilder.durable(AI_CV_PREPROCESSING_QUEUE).build();
+    }
+
+    @Bean
+    public Queue aiJdPreprocessingQueue() {
+        return QueueBuilder.durable(AI_JD_PREPROCESSING_QUEUE).build();
+    }
 
     @Bean
     public Queue aiAnalysisQueue() {
-        return new Queue(AI_ANALYSIS_QUEUE, true);
+        return QueueBuilder.durable(AI_ANALYSIS_QUEUE).build();
     }
 
-    // ============================================================
-    // 6. QUEUE - AI INTERVIEW
-    // ============================================================
+    // =========================
+    // BINDINGS
+    // =========================
 
     @Bean
-    public Queue aiInterviewQueue() {
-        return new Queue(AI_INTERVIEW_QUEUE, true);
+    public Binding cvPreprocessingBinding(
+            Queue aiCvPreprocessingQueue,
+            DirectExchange careerExchange) {
+
+        return BindingBuilder
+                .bind(aiCvPreprocessingQueue)
+                .to(careerExchange)
+                .with(RoutingKeys.CV_PREPROCESSING_REQUEST);
     }
 
-    // ============================================================
-    // 7. BINDING - AI ANALYSIS
-    // ============================================================
+    @Bean
+    public Binding jdPreprocessingBinding(
+            Queue aiJdPreprocessingQueue,
+            DirectExchange careerExchange) {
+
+        return BindingBuilder
+                .bind(aiJdPreprocessingQueue)
+                .to(careerExchange)
+                .with(RoutingKeys.JD_PREPROCESSING_REQUEST);
+    }
 
     @Bean
-    public Binding aiAnalysisBinding(
+    public Binding analysisBinding(
             Queue aiAnalysisQueue,
-            DirectExchange aiExchange) {
+            DirectExchange careerExchange) {
 
         return BindingBuilder
                 .bind(aiAnalysisQueue)
-                .to(aiExchange)
-                .with(AI_ANALYSIS_ROUTING_KEY);
+                .to(careerExchange)
+                .with(RoutingKeys.CV_ANALYSIS_REQUEST);
     }
 
-    // ============================================================
-    // 8. BINDING - AI INTERVIEW
-    // ============================================================
+    // =========================
+    // JSON MESSAGE CONVERTER
+    // =========================
 
     @Bean
-    public Binding aiInterviewBinding(
-            Queue aiInterviewQueue,
-            DirectExchange aiExchange) {
-
-        return BindingBuilder
-                .bind(aiInterviewQueue)
-                .to(aiExchange)
-                .with(AI_INTERVIEW_ROUTING_KEY);
+    public MessageConverter jsonMessageConverter() {
+        return new JacksonJsonMessageConverter();
     }
 }
