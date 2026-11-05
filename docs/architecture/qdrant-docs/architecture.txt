@@ -1,0 +1,91 @@
+## 1. Thiết kế Qdrant đề xuất
+
+## Qdrant
+
+Một collection dùng chung
+
+#####################################################################################################################################
+`career_vectors`
+
+Lưu các vector phục vụ những nghiệp vụ AI của Career Platform.
+
+CV Documents                                                           |  JD Documents
+
+PROFILE · EDUCATION · EXPERIENCE · PROJECTS · SKILLS · CERTIFICATIONS  | OVERVIEW · RESPONSIBILITIES · REQUIREMENTS · SKILLS
+
+Các metadata cần có
+
+- `documentType`: `CV` hoặc `JD`
+- `cvId`: định danh CV
+- `jdId`: định danh JD
+- `contentType`: loại nội dung của từng document
+#####################################################################################################################################
+
+Ví dụ:
+
+```
+{
+  "documentType": "CV",
+  "cvId": "uuid-cv",
+  "contentType": "EXPERIENCE"
+}
+```
+
+```
+{
+  "documentType": "JD",
+  "jdId": "uuid-jd",
+  "contentType": "REQUIREMENTS"
+}
+```
+
+Các metadata này giúp truy vấn đúng loại dữ liệu, đúng CV hoặc JD mà không phải tạo collection riêng cho từng nghiệp vụ.
+
+## 2. Có hỗ trợ được các luồng sau không?
+
+| Nghiệp vụ            | Cách tận dụng `career_vectors`                                                                          |
+| -------------------- | ------------------------------------------------------------------------------------------------------- |
+| Match Score          | So sánh vector CV với vector JD, truy vấn các phần kinh nghiệm, kỹ năng và yêu cầu công việc tương ứng. |
+| Skill Gap            | Đối chiếu kỹ năng trong CV với kỹ năng REQUIRED/PREFERRED trong JD.                                     |
+| CV Audit             | Truy xuất các phần CV liên quan để đánh giá nội dung, từ khóa và mức độ phù hợp.                        |
+| Chỉnh sửa CV bằng AI | Lấy đúng EXPERIENCE, PROJECTS, SKILLS để đề xuất cải thiện nội dung dựa trên dữ liệu gốc.               |
+| AI Mock Interview    | Lấy kinh nghiệm, dự án và kỹ năng trong CV kết hợp với yêu cầu JD để tạo câu hỏi phỏng vấn phù hợp.     |
+
+Có một điểm cần phân biệt: Qdrant là nơi lưu và truy xuất ngữ nghĩa, không phải nơi lưu CV/JD đầy đủ hay nơi quyết định Match Score. Core Service vẫn nên quản lý dữ liệu gốc; AI Engine kết hợp dữ liệu truy xuất với Gemini và logic scoring để xử lý nghiệp vụ.
+
+## 3. Cần thống nhất một số nguyên tắc ngay từ đầu
+
+1. Dùng chung một embedding model cho CV và JD để vector có thể so sánh trong cùng không gian.
+2. Mỗi document có ID ổn định theo `entityId + contentType`, để cập nhật CV/JD không tạo bản ghi trùng.
+3. Dùng metadata để lọc theo `documentType`, `cvId`, `jdId`, tránh lấy nhầm dữ liệu giữa người dùng hoặc giữa các JD.
+4. Không đưa email, số điện thoại, địa chỉ cá nhân vào vector nếu không phục vụ tìm kiếm ngữ nghĩa.
+5. Dữ liệu phỏng vấn và lịch sử chỉnh sửa không nhất thiết phải nhét vào collection này. Chỉ lưu vector khi thực sự cần tìm kiếm ngữ nghĩa.
+
+## 4. Cấu hình cần đổi
+
+Trong `application.properties`, đổi:
+
+```
+spring.ai.vectorstore.qdrant.collection-name=jd_vectors
+```
+
+thành:
+
+```
+spring.ai.vectorstore.qdrant.collection-name=career_vectors
+```
+
+Lưu ý: nếu collection `jd_vectors` đã có dữ liệu, đổi tên sẽ không tự chuyển dữ liệu cũ sang `career_vectors`. Nếu đang trong giai đoạn phát triển và chưa có dữ liệu quan trọng thì có thể chuyển luôn.
+
+## 5. Một lưu ý cho thiết kế về sau
+
+Mình đề xuất phân chia như sau:
+
+- `career_vectors`: CV và JD, phục vụ Match Score, Skill Gap, CV Audit và truy xuất ngữ cảnh cho AI.
+- Dữ liệu CV/JD gốc: tiếp tục lưu ở Core Service.
+- Dữ liệu lịch sử chỉnh sửa CV: lưu ở Core Service; sau khi người dùng xác nhận phiên bản mới thì cập nhật vector tương ứng.
+- Dữ liệu buổi phỏng vấn: lưu ở Core Service. Chỉ cân nhắc tạo vector riêng nếu sau này cần tìm kiếm ngữ nghĩa trong lịch sử phỏng vấn.
+
+Kết luận: Chọn `career_vectors` là hợp lý và đủ linh hoạt cho kiến trúc hiện tại. Không cần tạo collection riêng cho từng chức năng AI ngay từ đầu.
+
+Một chi tiết mình sẽ xử lý khi triển khai: cập nhật CV/JD phải xóa cả những document cũ thuộc các phân đoạn không còn nội dung, tránh để vector cũ tồn tại và làm sai kết quả truy xuất.
