@@ -1,6 +1,8 @@
 package com.ptit.core_platform_service.messaging;
 
 import com.ptit.core_platform_service.config.RabbitMQConfig;
+import com.ptit.core_platform_service.dto.analysis.DashboardAnalysisResult;
+
 import lombok.RequiredArgsConstructor;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Component;
@@ -88,8 +90,7 @@ public class CoreMessageProducer {
      * Routing key:
      * CV_ANALYSIS_RESULT
      */
-    public void sendAnalysisResult(Object result) {
-
+    public void sendAnalysisResult(DashboardAnalysisResult result) {
         rabbitTemplate.convertAndSend(
                 RabbitMQConfig.EXCHANGE,
                 RabbitMQConfig.CV_ANALYSIS_RESULT,

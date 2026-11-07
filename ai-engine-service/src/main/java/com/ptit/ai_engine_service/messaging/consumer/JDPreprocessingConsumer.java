@@ -1,3 +1,4 @@
+
 package com.ptit.ai_engine_service.messaging.consumer;
 
 import com.ptit.ai_engine_service.configs.RabbitMQConfig;
@@ -39,8 +40,9 @@ public class JDPreprocessingConsumer {
             result = preprocessingService.preprocess(request);
 
             log.info(
-                    "JD preprocessing completed: jdId={}",
-                    result.jdId());
+                    "JD preprocessing completed: jdId={}, jdPosition={}",
+                    result.jdId(),
+                    result.jdPosition());
 
         } catch (Exception exception) {
 
@@ -51,6 +53,7 @@ public class JDPreprocessingConsumer {
 
             result = new JDPreprocessingResult(
                     request != null ? request.jdId() : null,
+                    null,
                     null,
                     false,
                     exception.getMessage() != null

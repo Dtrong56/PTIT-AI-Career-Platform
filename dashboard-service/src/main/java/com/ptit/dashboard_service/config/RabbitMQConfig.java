@@ -4,62 +4,72 @@ import org.springframework.amqp.core.Binding;
 import org.springframework.amqp.core.BindingBuilder;
 import org.springframework.amqp.core.DirectExchange;
 import org.springframework.amqp.core.Queue;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 @Configuration
 public class RabbitMQConfig {
 
-    // ============================================================
-    // 1. EXCHANGE
-    // ============================================================
+    public static final String EXCHANGE = "ptit.career.exchange";
 
-    public static final String EXCHANGE = "ptit.ai.exchange";
+    public static final String DASHBOARD_CV_ADD_QUEUE = "dashboard.cv.add.queue";
 
-    // ============================================================
-    // 2. QUEUE
-    // ============================================================
-    // Dashboard nhận kết quả AI để xử lý dữ liệu báo cáo.
-    // ============================================================
+    public static final String DASHBOARD_JD_ADD_QUEUE = "dashboard.jd.add.queue";
 
-    public static final String AI_RESULT_QUEUE = "dashboard.ai.result.queue";
+    public static final String DASHBOARD_ANALYSIS_RESULT_QUEUE = "dashboard.analysis.result.queue";
 
-    // ============================================================
-    // 3. ROUTING KEY
-    // ============================================================
-
-    public static final String AI_RESULT_ROUTING_KEY = "ai.result";
-
-    // ============================================================
-    // 4. EXCHANGE
-    // ============================================================
+    public static final String CV_ADD_REQUEST = "cv.add.request";
+    public static final String JD_ADD_REQUEST = "jd.add.request";
+    public static final String CV_ANALYSIS_RESULT = "cv.analysis.result";
 
     @Bean
-    public DirectExchange aiExchange() {
+    public DirectExchange careerExchange() {
         return new DirectExchange(EXCHANGE);
     }
 
-    // ============================================================
-    // 5. QUEUE
-    // ============================================================
-
     @Bean
-    public Queue aiResultQueue() {
-        return new Queue(AI_RESULT_QUEUE, true);
+    public Queue dashboardCvAddQueue() {
+        return new Queue(DASHBOARD_CV_ADD_QUEUE, true);
     }
 
-    // ============================================================
-    // 6. BINDING
-    // ============================================================
+    @Bean
+    public Queue dashboardJdAddQueue() {
+        return new Queue(DASHBOARD_JD_ADD_QUEUE, true);
+    }
 
     @Bean
-    public Binding aiResultBinding(
-            Queue aiResultQueue,
-            DirectExchange aiExchange) {
+    public Queue dashboardAnalysisResultQueue() {
+        return new Queue(DASHBOARD_ANALYSIS_RESULT_QUEUE, true);
+    }
 
-        return BindingBuilder
-                .bind(aiResultQueue)
-                .to(aiExchange)
-                .with(AI_RESULT_ROUTING_KEY);
+    @Bean
+    public Binding dashboardCvAddBinding(
+            @Qualifier("dashboardCvAddQueue") Queue queue,
+            DirectExchange careerExchange) {
+
+        return BindingBuilder.bind(queue)
+                .to(careerExchange)
+                .with(CV_ADD_REQUEST);
+    }
+
+    @Bean
+    public Binding dashboardJdAddBinding(
+            @Qualifier("dashboardJdAddQueue") Queue queue,
+            DirectExchange careerExchange) {
+
+        return BindingBuilder.bind(queue)
+                .to(careerExchange)
+                .with(JD_ADD_REQUEST);
+    }
+
+    @Bean
+    public Binding dashboardAnalysisResultBinding(
+            @Qualifier("dashboardAnalysisResultQueue") Queue queue,
+            DirectExchange careerExchange) {
+
+        return BindingBuilder.bind(queue)
+                .to(careerExchange)
+                .with(CV_ANALYSIS_RESULT);
     }
 }

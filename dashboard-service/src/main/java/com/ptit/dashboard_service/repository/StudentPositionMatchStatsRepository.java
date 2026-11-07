@@ -5,13 +5,14 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 public interface StudentPositionMatchStatsRepository
-        extends JpaRepository<StudentPositionMatchStats, Long> {
+                extends JpaRepository<StudentPositionMatchStats, Long> {
 
-    List<StudentPositionMatchStats> findByUserId(Long userId);
+        List<StudentPositionMatchStats> findByStudentId(UUID studentId);
 
-    Optional<StudentPositionMatchStats> findByUserIdAndJdPosition(
-            Long userId,
-            String jdPosition);
+        Optional<StudentPositionMatchStats> findByStudentIdAndJdPosition(
+                        UUID studentId,
+                        String jdPosition);
 }

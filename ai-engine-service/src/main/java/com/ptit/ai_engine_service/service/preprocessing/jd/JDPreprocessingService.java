@@ -1,6 +1,8 @@
+
 package com.ptit.ai_engine_service.service.preprocessing.jd;
 
 import com.ptit.ai_engine_service.dto.request.JDPreprocessingRequest;
+import com.ptit.ai_engine_service.dto.response.JDPreprocessingData;
 import com.ptit.ai_engine_service.dto.response.JDPreprocessingResult;
 import com.ptit.ai_engine_service.service.embedding.EmbeddingService;
 import com.ptit.ai_engine_service.service.extraction.jd.JDExtractionService;
@@ -13,13 +15,12 @@ import java.util.List;
 
 @Service
 public class JDPreprocessingService {
-        // Khai báo các service cần thiết để xử lý JD
+
         private final JDExtractionService extractionService;
         private final JDNormalizationService normalizationService;
         private final EmbeddingService embeddingService;
         private final JDVectorService jdVectorService;
 
-        // Constructor để inject các service vào JDPreprocessingService
         public JDPreprocessingService(
                         JDExtractionService extractionService,
                         JDNormalizationService normalizationService,
@@ -32,20 +33,6 @@ public class JDPreprocessingService {
                 this.jdVectorService = jdVectorService;
         }
 
-        /**
-         * Phương thức preprocess thực hiện các bước xử lý JD từ raw content đến lưu trữ
-         * vector.
-         *
-         * @param request Yêu cầu chứa thông tin JD cần xử lý.
-         * @return Kết quả xử lý JD.
-         * @throws Exception Nếu có lỗi trong quá trình xử lý.
-         *                   0. Kiểm tra tính hợp lệ của request và raw content.
-         *                   1. Gọi Gemini để trích xuất thông tin từ raw content.
-         *                   2. Chuẩn hóa thông tin đã trích xuất.
-         *                   3. Tạo các tài liệu cho việc tạo embedding.
-         *                   4. Tạo embedding và lưu trữ vào Qdrant.
-         *                   5. Trả về kết quả xử lý cho Core.
-         */
         public JDPreprocessingResult preprocess(
                         JDPreprocessingRequest request) throws Exception {
 
@@ -71,8 +58,10 @@ public class JDPreprocessingService {
                 }
 
                 // Step 2: Normalize extracted information.
-                String structuredContent = normalizationService.normalize(
-                                extractedJson);
+                JDPreprocessingData preprocessingData = normalizationService.normalize(extractedJson);
+
+                String jdPosition = preprocessingData.jdPosition();
+                String structuredContent = preprocessingData.structuredContent();
 
                 // Step 3: Prepare documents for embedding.
                 List<Document> documents = embeddingService.createJDDocuments(
@@ -87,6 +76,7 @@ public class JDPreprocessingService {
                 // Step 5: Return result to Core.
                 return new JDPreprocessingResult(
                                 request.jdId(),
+                                jdPosition,
                                 structuredContent,
                                 true,
                                 null);

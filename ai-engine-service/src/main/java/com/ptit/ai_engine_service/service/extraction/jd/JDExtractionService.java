@@ -1,3 +1,4 @@
+
 package com.ptit.ai_engine_service.service.extraction.jd;
 
 import org.springframework.ai.chat.client.ChatClient;
@@ -26,6 +27,7 @@ public class JDExtractionService {
         Use exactly this JSON structure:
 
         {
+          "jdPosition": "string or null",
           "jobTitle": "string or null",
           "company": "string or null",
           "experience": "string or null",
@@ -42,6 +44,30 @@ public class JDExtractionService {
         }
 
         Rules:
+
+        JD POSITION:
+        - Extract the actual job role that the company is recruiting for.
+        - jdPosition represents the normalized job family or profession,
+          not the exact job title.
+        - Normalize similar job titles into a consistent position.
+        - Examples:
+          + Java Backend Developer -> Backend Developer
+          + Backend Developer Intern -> Backend Developer
+          + Backend Engineer -> Backend Developer
+          + Frontend ReactJS Developer -> Frontend Developer
+          + Frontend Engineer -> Frontend Developer
+          + Business Analyst Intern -> Business Analyst
+          + Manual Tester -> QA/QC Engineer
+          + Automation Tester -> QA/QC Engineer
+        - Do not confuse job position with seniority, employment type,
+          company name, or working location.
+        - If the job position cannot be confidently identified,
+          return null.
+        - Do not invent a job position unsupported by the JD.
+
+        OTHER FIELDS:
+        - jobTitle should preserve the specific title stated in the JD,
+          including seniority or internship level when available.
         - Extract only information supported by the JD.
         - Do not invent missing information.
         - Use null when a scalar field is unavailable.

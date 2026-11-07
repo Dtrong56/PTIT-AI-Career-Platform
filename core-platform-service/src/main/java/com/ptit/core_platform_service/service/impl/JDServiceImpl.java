@@ -93,36 +93,35 @@ public class JDServiceImpl implements JDService {
          */
         @Override
         @Transactional
-        public void handlePreprocessingCompleted(
-                        JDPreprocessingResult result) {
+        public void handlePreprocessingCompleted(JDPreprocessingResult result) {
 
-                // 1. Tìm JD
+                // 1. Tìm JD theo jdId
                 JD jd = jdRepository.findById(result.jdId())
-                                .orElseThrow(() -> new RuntimeException(
-                                                "JD not found: " + result.jdId()));
+                                .orElseThrow(() -> new RuntimeException("JD not found: " + result.jdId()));
 
                 // 2. Kiểm tra kết quả preprocessing
                 if (!result.success()) {
-
-                        // 3. Preprocessing thất bại
                         jd.setStatus(ProcessingStatus.FAILED);
                         jd.setUpdatedAt(LocalDateTime.now());
-
-                        // TODO:
-                        // Nếu entity JD sau này có errorMessage
-                        // thì lưu result.errorMessage() tại đây.
 
                         jdRepository.save(jd);
                         return;
                 }
 
-                // 4. Preprocessing thành công
+                // 3. Cập nhật kết quả AI trả về
+                jd.setJdPosition(result.jdPosition());
                 jd.setStructuredContent(result.structuredContent());
                 jd.setStatus(ProcessingStatus.COMPLETED);
                 jd.setUpdatedAt(LocalDateTime.now());
 
-                // 5. Lưu JD
-                jdRepository.save(jd);
+                // 4. Lưu JD đã preprocessing
+                JD savedJD = jdRepository.save(jd);
+
+                // 5. Thông báo Dashboard cập nhật dữ liệu JD
+                coreMessageProducer.sendJDAddEvent(
+                                new JDAddRequest(
+                                                savedJD.getJdId(),
+                                                savedJD.getStudent().getStudentId()));
         }
 
         /**

@@ -2,6 +2,8 @@ package com.ptit.dashboard_service.entity;
 
 import jakarta.persistence.*;
 
+import java.util.UUID;
+
 @Entity
 @Table(name = "student_position_match_stats")
 public class StudentPositionMatchStats {
@@ -10,7 +12,7 @@ public class StudentPositionMatchStats {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    private Long userId;
+    private UUID studentId;
 
     private String jdPosition;
 
@@ -22,11 +24,11 @@ public class StudentPositionMatchStats {
     }
 
     public StudentPositionMatchStats(
-            Long userId,
+            UUID studentId,
             String jdPosition,
             Integer analysisCount,
             Double averageMatchScore) {
-        this.userId = userId;
+        this.studentId = studentId;
         this.jdPosition = jdPosition;
         this.analysisCount = analysisCount;
         this.averageMatchScore = averageMatchScore;
@@ -36,12 +38,12 @@ public class StudentPositionMatchStats {
         return id;
     }
 
-    public Long getUserId() {
-        return userId;
+    public UUID getStudentId() {
+        return studentId;
     }
 
-    public void setUserId(Long userId) {
-        this.userId = userId;
+    public void setStudentId(UUID studentId) {
+        this.studentId = studentId;
     }
 
     public String getJdPosition() {

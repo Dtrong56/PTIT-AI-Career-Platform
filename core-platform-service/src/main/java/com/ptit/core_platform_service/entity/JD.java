@@ -27,6 +27,9 @@ public class JD {
     @Column(nullable = false)
     private String title;
 
+    @Column(length = 255)
+    private String jdPosition;
+
     @Column(columnDefinition = "TEXT")
     private String rawContent;
 

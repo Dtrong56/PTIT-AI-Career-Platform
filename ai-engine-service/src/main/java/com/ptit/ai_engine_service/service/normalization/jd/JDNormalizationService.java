@@ -1,9 +1,11 @@
+
 package com.ptit.ai_engine_service.service.normalization.jd;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.ptit.ai_engine_service.dto.response.JDPreprocessingData;
 import org.springframework.stereotype.Service;
 
 import java.util.HashSet;
@@ -13,23 +15,35 @@ import java.util.Set;
 @Service
 public class JDNormalizationService {
 
+    // khai báo ObjectMapper để xử lý JSON
     private final ObjectMapper objectMapper;
 
     public JDNormalizationService(ObjectMapper objectMapper) {
         this.objectMapper = objectMapper;
     }
 
-    public String normalize(String extractedJson) throws Exception {
+    /**
+     * Chuẩn hóa thông tin trả về từ mô tả công việc (JD) đã được trích xuất.
+     * 
+     * @param extractedJson
+     * @return
+     * @throws Exception
+     */
+    public JDPreprocessingData normalize(String extractedJson) throws Exception {
 
         String json = extractedJson.trim();
 
-        // Xử lý trường hợp Gemini trả về JSON trong Markdown.
+        // Handle JSON returned inside Markdown code fences.
         if (json.startsWith("```")) {
             json = json.replaceFirst("^```(?:json)?\\s*", "");
             json = json.replaceFirst("\\s*```$", "");
         }
 
         JsonNode source = objectMapper.readTree(json);
+
+        // Normalize job position separately from structured content.
+        String jdPosition = normalizeJDPosition(
+                normalizeText(source.get("jdPosition")));
 
         ObjectNode result = objectMapper.createObjectNode();
 
@@ -51,7 +65,88 @@ public class JDNormalizationService {
 
         result.set("skills", normalizeSkills(source.get("skills")));
 
-        return objectMapper.writeValueAsString(result);
+        String structuredContent = objectMapper.writeValueAsString(result);
+
+        return new JDPreprocessingData(
+                jdPosition,
+                structuredContent);
+    }
+
+    /**
+     * Chuẩn hóa vị trí jd
+     * 
+     * @param position
+     * @return
+     */
+    private String normalizeJDPosition(String position) {
+
+        if (position == null) {
+            return null;
+        }
+
+        String normalized = position
+                .trim()
+                .replaceAll("\\s+", " ");
+
+        String key = normalized.toLowerCase(Locale.ROOT);
+
+        return switch (key) {
+            case "backend",
+                    "backend developer",
+                    "backend engineer",
+                    "back-end developer",
+                    "back end developer" ->
+                "Backend Developer";
+
+            case "frontend",
+                    "frontend developer",
+                    "frontend engineer",
+                    "front-end developer",
+                    "front end developer" ->
+                "Frontend Developer";
+
+            case "fullstack",
+                    "full stack developer",
+                    "full-stack developer",
+                    "fullstack developer" ->
+                "Full Stack Developer";
+
+            case "business analyst",
+                    "ba" ->
+                "Business Analyst";
+
+            case "qa",
+                    "qc",
+                    "qa/qc",
+                    "qa/qc engineer",
+                    "quality assurance engineer",
+                    "software tester",
+                    "manual tester",
+                    "automation tester" ->
+                "QA/QC Engineer";
+
+            case "data analyst" ->
+                "Data Analyst";
+
+            case "data engineer" ->
+                "Data Engineer";
+
+            case "devops",
+                    "devops engineer" ->
+                "DevOps Engineer";
+
+            case "ui/ux designer",
+                    "ui ux designer",
+                    "ux/ui designer" ->
+                "UI/UX Designer";
+
+            case "mobile developer",
+                    "mobile app developer",
+                    "mobile engineer" ->
+                "Mobile Developer";
+
+            default -> normalized;
+        };
     }
 
     private ArrayNode normalizeStringArray(JsonNode source) {
