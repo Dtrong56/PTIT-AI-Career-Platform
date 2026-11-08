@@ -74,13 +74,19 @@ public class AnalysisServiceImpl implements AnalysisService {
                 // ==========================================
 
                 if (cv.getStatus() != ProcessingStatus.COMPLETED) {
-                        throw new IllegalStateException(
-                                        "CV has not completed preprocessing");
+                        throw new IllegalStateException("CV has not completed preprocessing");
                 }
 
                 if (jd.getStatus() != ProcessingStatus.COMPLETED) {
-                        throw new IllegalStateException(
-                                        "JD has not completed preprocessing");
+                        throw new IllegalStateException("JD has not completed preprocessing");
+                }
+
+                if (cv.getStructuredContent() == null || cv.getStructuredContent().isBlank()) {
+                        throw new IllegalStateException("CV structured content is empty");
+                }
+
+                if (jd.getStructuredContent() == null || jd.getStructuredContent().isBlank()) {
+                        throw new IllegalStateException("JD structured content is empty");
                 }
 
                 // ==========================================
@@ -103,14 +109,14 @@ public class AnalysisServiceImpl implements AnalysisService {
                 // ==========================================
                 // 6. Gửi request sang AI Engine
                 // ==========================================
-
                 CVAnalysisRequest analysisRequest = new CVAnalysisRequest(
                                 analysis.getAnalysisId(),
                                 cv.getCvId(),
-                                jd.getJdId());
+                                jd.getJdId(),
+                                cv.getStructuredContent(),
+                                jd.getStructuredContent());
 
-                messageProducer.sendAnalysisRequest(
-                                analysisRequest);
+                messageProducer.sendAnalysisRequest(analysisRequest);
 
                 // ==========================================
                 // 7. Trả response PENDING

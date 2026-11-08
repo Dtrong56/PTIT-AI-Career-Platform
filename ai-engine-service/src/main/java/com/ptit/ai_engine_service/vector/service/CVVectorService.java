@@ -89,7 +89,7 @@ public class CVVectorService {
          */
         private static String create(UUID cvId, String contentType) {
             return UUID.nameUUIDFromBytes(
-                    (cvId + "_" + contentType)
+                    ("CV_" + cvId + "_" + contentType)
                             .getBytes(java.nio.charset.StandardCharsets.UTF_8))
                     .toString();
         }

@@ -158,3 +158,52 @@ else AI processing successful
 end
 
 @enduml
+
+
+
+
+@startuml
+title CV-JD Analysis Request - Core to AI Engine
+
+actor Frontend
+participant "AnalysisController" as Controller
+participant "AnalysisServiceImpl" as Service
+participant "CVRepository" as CVRepo
+participant "JDRepository" as JDRepo
+participant "AnalysisRepository" as AnalysisRepo
+participant "CoreMessageProducer" as Producer
+queue RabbitMQ
+participant "AI Engine Service" as AI
+
+Frontend -> Controller: POST /api/core/analyses
+Controller -> Service: createAnalysis(request)
+
+Service -> CVRepo: findById(cvId)
+CVRepo --> Service: CV
+
+Service -> JDRepo: findById(jdId)
+JDRepo --> Service: JD
+
+Service -> Service: Validate CV/JD status
+Service -> Service: Validate structuredContent
+
+Service -> AnalysisRepo: save(Analysis)
+AnalysisRepo --> Service: Analysis(PENDING)
+
+Service -> Service: Build CVAnalysisRequest
+note right of Service
+analysisId
+cvId
+jdId
+structuredCv
+structuredJd
+end note
+
+Service -> Producer: sendAnalysisRequest(request)
+Producer -> RabbitMQ: Publish CV_ANALYSIS_REQUEST
+RabbitMQ -> AI: CVAnalysisRequest
+
+Service --> Controller: AnalysisResponse(PENDING)
+Controller --> Frontend: Return response
+
+@enduml

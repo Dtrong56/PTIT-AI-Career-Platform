@@ -4,6 +4,8 @@ import com.ptit.ai_engine_service.configs.RabbitMQConfig;
 import com.ptit.ai_engine_service.dto.request.CVAnalysisRequest;
 import com.ptit.ai_engine_service.dto.response.CVAnalysisResult;
 import com.ptit.ai_engine_service.messaging.publisher.AIMessagePublisher;
+import com.ptit.ai_engine_service.service.scoring.CVJDAnalysisService;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
@@ -17,9 +19,14 @@ public class CVAnalysisConsumer {
     private static final Logger log = LoggerFactory.getLogger(CVAnalysisConsumer.class);
 
     private final AIMessagePublisher publisher;
+    private final CVJDAnalysisService analysisService;
 
-    public CVAnalysisConsumer(AIMessagePublisher publisher) {
+    public CVAnalysisConsumer(
+            AIMessagePublisher publisher,
+            CVJDAnalysisService analysisService) {
+
         this.publisher = publisher;
+        this.analysisService = analysisService;
     }
 
     @RabbitListener(queues = RabbitMQConfig.AI_ANALYSIS_QUEUE)
@@ -34,10 +41,19 @@ public class CVAnalysisConsumer {
         CVAnalysisResult result;
 
         try {
-            result = process(request);
+            result = analysisService.analyze(request);
+
+            log.info(
+                    "CV analysis completed: analysisId={}, matchScore={}",
+                    request.analysisId(),
+                    result.matchScore());
+
         } catch (Exception exception) {
-            log.error("CV analysis failed: analysisId={}",
-                    request.analysisId(), exception);
+
+            log.error(
+                    "CV analysis failed: analysisId={}",
+                    request.analysisId(),
+                    exception);
 
             result = new CVAnalysisResult(
                     request.analysisId(),
@@ -50,21 +66,5 @@ public class CVAnalysisConsumer {
         }
 
         publisher.sendCVAnalysisResult(result);
-    }
-
-    private CVAnalysisResult process(CVAnalysisRequest request) {
-
-        // TODO: Gọi CV-JD matching pipeline.
-        // Pipeline sẽ tính semanticScore, skillScore,
-        // matchScore và skillGaps.
-
-        return new CVAnalysisResult(
-                request.analysisId(),
-                null,
-                null,
-                null,
-                List.of(),
-                false,
-                "CV analysis pipeline has not been implemented yet.");
     }
 }

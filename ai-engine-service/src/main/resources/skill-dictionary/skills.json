@@ -1,0 +1,82 @@
+{
+  "skills": [
+    {
+      "id": "S001",
+      "name": "Java",
+      "aliases": ["Java SE", "Java Standard Edition"],
+      "category": "PROGRAMMING_LANGUAGE"
+    },
+    {
+      "id": "S002",
+      "name": "JavaScript",
+      "aliases": ["JS", "Java Script"],
+      "category": "PROGRAMMING_LANGUAGE"
+    },
+    {
+      "id": "S003",
+      "name": "TypeScript",
+      "aliases": ["TS"],
+      "category": "PROGRAMMING_LANGUAGE"
+    },
+    {
+      "id": "S004",
+      "name": "Python",
+      "aliases": ["Python 3"],
+      "category": "PROGRAMMING_LANGUAGE"
+    },
+    {
+      "id": "S005",
+      "name": "React",
+      "aliases": ["ReactJS", "React.js"],
+      "category": "FRAMEWORK"
+    },
+    {
+      "id": "S006",
+      "name": "Node.js",
+      "aliases": ["NodeJS", "Node JS"],
+      "category": "RUNTIME"
+    },
+    {
+      "id": "S007",
+      "name": "Spring Boot",
+      "aliases": ["Springboot", "SpringBoot"],
+      "category": "FRAMEWORK"
+    },
+    {
+      "id": "S008",
+      "name": "Spring Framework",
+      "aliases": ["Spring"],
+      "category": "FRAMEWORK"
+    },
+    {
+      "id": "S009",
+      "name": "PostgreSQL",
+      "aliases": ["Postgre SQL", "Postgres", "PostgreSQL Database"],
+      "category": "DATABASE"
+    },
+    {
+      "id": "S010",
+      "name": "MySQL",
+      "aliases": ["My SQL"],
+      "category": "DATABASE"
+    },
+    {
+      "id": "S011",
+      "name": "MongoDB",
+      "aliases": ["Mongo DB"],
+      "category": "DATABASE"
+    },
+    {
+      "id": "S012",
+      "name": "Docker",
+      "aliases": [],
+      "category": "TOOL"
+    },
+    {
+      "id": "S013",
+      "name": "Kubernetes",
+      "aliases": ["K8s"],
+      "category": "TOOL"
+    }
+  ]
+}

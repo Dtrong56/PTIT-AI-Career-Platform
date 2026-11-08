@@ -6,6 +6,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.ptit.ai_engine_service.dto.response.JDPreprocessingData;
+import com.ptit.ai_engine_service.service.normalization.skill.SkillNormalizationService;
+
 import org.springframework.stereotype.Service;
 
 import java.util.HashSet;
@@ -15,11 +17,17 @@ import java.util.Set;
 @Service
 public class JDNormalizationService {
 
-    // khai báo ObjectMapper để xử lý JSON
+    // khai báo các biến cần thiết
     private final ObjectMapper objectMapper;
+    private final SkillNormalizationService skillNormalizationService;
 
-    public JDNormalizationService(ObjectMapper objectMapper) {
+    // Constructor để khởi tạo các biến
+    public JDNormalizationService(
+            ObjectMapper objectMapper,
+            SkillNormalizationService skillNormalizationService) {
+
         this.objectMapper = objectMapper;
+        this.skillNormalizationService = skillNormalizationService;
     }
 
     /**
@@ -64,6 +72,13 @@ public class JDNormalizationService {
                 normalizeStringArray(source.get("benefits")));
 
         result.set("skills", normalizeSkills(source.get("skills")));
+
+        result.put("location", normalizeText(source.get("location")));
+        result.put("salary", normalizeText(source.get("salary")));
+
+        result.set(
+                "qualifications",
+                normalizeStringArray(source.get("qualifications")));
 
         String structuredContent = objectMapper.writeValueAsString(result);
 
@@ -187,11 +202,11 @@ public class JDNormalizationService {
 
         for (JsonNode skill : source) {
 
-            String name = normalizeText(skill.get("name"));
+            String extractedName = normalizeText(skill.get("name"));
             String type = normalizeText(skill.get("type"));
-            String category = normalizeText(skill.get("category"));
+            String extractedCategory = normalizeText(skill.get("category"));
 
-            if (name == null || type == null) {
+            if (extractedName == null || type == null) {
                 continue;
             }
 
@@ -202,39 +217,45 @@ public class JDNormalizationService {
                 continue;
             }
 
-            name = normalizeSkillName(name);
+            SkillNormalizationService.NormalizedSkill normalized = skillNormalizationService.normalize(
+                    extractedName,
+                    extractedCategory);
 
-            String key = name.toLowerCase(Locale.ROOT);
+            if (normalized == null) {
+                continue;
+            }
+
+            String key = normalized.name().toLowerCase(Locale.ROOT);
 
             if (!uniqueSkills.add(key)) {
+
+                // REQUIRED takes precedence over PREFERRED.
+                for (JsonNode existingSkill : result) {
+
+                    if (existingSkill.path("name").asText("")
+                            .equalsIgnoreCase(normalized.name())) {
+
+                        if (type.equals("REQUIRED")) {
+                            ((ObjectNode) existingSkill).put("type", "REQUIRED");
+                        }
+
+                        break;
+                    }
+                }
+
                 continue;
             }
 
             ObjectNode normalizedSkill = objectMapper.createObjectNode();
 
-            normalizedSkill.put("name", name);
+            normalizedSkill.put("name", normalized.name());
             normalizedSkill.put("type", type);
-            normalizedSkill.put(
-                    "category",
-                    category == null ? "OTHER" : category.toUpperCase(Locale.ROOT));
+            normalizedSkill.put("category", normalized.category());
 
             result.add(normalizedSkill);
         }
 
         return result;
-    }
-
-    private String normalizeSkillName(String name) {
-
-        String normalized = name.trim().replaceAll("\\s+", " ");
-
-        return switch (normalized.toLowerCase(Locale.ROOT)) {
-            case "springboot" -> "Spring Boot";
-            case "postgres sql", "postgresql database" -> "PostgreSQL";
-            case "javascript" -> "JavaScript";
-            case "nodejs", "node js" -> "Node.js";
-            default -> normalized;
-        };
     }
 
     private String normalizeText(JsonNode node) {

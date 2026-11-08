@@ -63,6 +63,11 @@ public class CVPreprocessingService {
                 // Step 1: Extract text from PDF.
                 String rawText = extractionService.extract(request.fileData());
 
+                if (rawText == null || rawText.isBlank()) {
+                        throw new IllegalStateException(
+                                        "No readable text found in the CV PDF.");
+                }
+
                 // Step 2: Structure CV information using Gemini.
                 String extractedJson = structuringService.structure(rawText);
 

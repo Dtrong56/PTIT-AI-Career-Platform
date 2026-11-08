@@ -40,21 +40,27 @@ public class EmbeddingService {
             UUID jdId,
             String structuredContent) throws Exception {
 
-        JsonNode jd = objectMapper.readTree(structuredContent);
+        if (jdId == null) {
+            throw new IllegalArgumentException("jdId must not be null.");
+        }
 
+        if (structuredContent == null || structuredContent.isBlank()) {
+            throw new IllegalArgumentException(
+                    "JD structured content must not be empty.");
+        }
+
+        JsonNode jd = objectMapper.readTree(structuredContent);
         List<Document> documents = new ArrayList<>();
 
-        // 1. General job information
-        String overview = buildOverview(jd);
-
-        addDocument(
+        // 1. Job title
+        addJDDocument(
                 documents,
                 jdId,
                 "OVERVIEW",
-                overview);
+                buildJDOverviewContent(jd));
 
         // 2. Responsibilities
-        addDocument(
+        addJDDocument(
                 documents,
                 jdId,
                 "RESPONSIBILITIES",
@@ -62,23 +68,22 @@ public class EmbeddingService {
                         "Job responsibilities",
                         jd.path("responsibilities")));
 
-        // 3. Requirements
-        addDocument(
+        // 3. Qualifications
+        addJDDocument(
                 documents,
                 jdId,
-                "REQUIREMENTS",
+                "QUALIFICATIONS",
                 buildListContent(
-                        "Job requirements",
-                        jd.path("requirements")));
+                        "Candidate qualifications",
+                        jd.path("qualifications")));
 
-        // 4. Skills
-        addDocument(
+        // 4. Required and preferred skills
+        addJDDocument(
                 documents,
                 jdId,
                 "SKILLS",
                 buildSkillsContent(jd.path("skills")));
 
-        // Remove empty documents.
         documents.removeIf(document -> document.getText() == null
                 || document.getText().isBlank());
 
@@ -91,13 +96,10 @@ public class EmbeddingService {
      * @param jd
      * @return
      */
-    private String buildOverview(JsonNode jd) {
-
+    private String buildJDOverviewContent(JsonNode jd) {
         StringBuilder content = new StringBuilder();
 
         appendField(content, "Job title", jd.path("jobTitle"));
-        appendField(content, "Company", jd.path("company"));
-        appendField(content, "Experience", jd.path("experience"));
 
         return content.toString();
     }
@@ -113,16 +115,21 @@ public class EmbeddingService {
             String title,
             JsonNode items) {
 
-        StringBuilder content = new StringBuilder();
-        content.append(title).append(":\n");
+        if (items == null || !items.isArray() || items.isEmpty()) {
+            return "";
+        }
 
-        if (items.isArray()) {
-            for (JsonNode item : items) {
-                if (item.isTextual() && !item.asText().isBlank()) {
-                    content.append("- ")
-                            .append(item.asText().trim())
-                            .append("\n");
+        StringBuilder content = new StringBuilder();
+
+        for (JsonNode item : items) {
+            if (item.isTextual() && !item.asText().isBlank()) {
+                if (content.isEmpty()) {
+                    content.append(title).append(":\n");
                 }
+
+                content.append("- ")
+                        .append(item.asText().trim())
+                        .append("\n");
             }
         }
 
@@ -137,28 +144,33 @@ public class EmbeddingService {
      */
     private String buildSkillsContent(JsonNode skills) {
 
+        if (skills == null || !skills.isArray() || skills.isEmpty()) {
+            return "";
+        }
+
         StringBuilder content = new StringBuilder();
-        content.append("Job required and preferred skills:\n");
 
-        if (skills.isArray()) {
-            for (JsonNode skill : skills) {
+        for (JsonNode skill : skills) {
 
-                String name = skill.path("name").asText("");
-                String type = skill.path("type").asText("");
-                String category = skill.path("category").asText("");
+            String name = skill.path("name").asText("");
+            String type = skill.path("type").asText("");
+            String category = skill.path("category").asText("");
 
-                if (name.isBlank()) {
-                    continue;
-                }
-
-                content.append("- ")
-                        .append(name)
-                        .append(" | Type: ")
-                        .append(type)
-                        .append(" | Category: ")
-                        .append(category)
-                        .append("\n");
+            if (name.isBlank()) {
+                continue;
             }
+
+            if (content.isEmpty()) {
+                content.append("Job skills:\n");
+            }
+
+            content.append("- ")
+                    .append(name.trim())
+                    .append(" | Type: ")
+                    .append(type)
+                    .append(" | Category: ")
+                    .append(category)
+                    .append("\n");
         }
 
         return content.toString();
@@ -172,7 +184,7 @@ public class EmbeddingService {
      * @param contentType
      * @param content
      */
-    private void addDocument(
+    private void addJDDocument(
             List<Document> documents,
             UUID jdId,
             String contentType,
@@ -183,15 +195,12 @@ public class EmbeddingService {
         }
 
         Map<String, Object> metadata = new HashMap<>();
+        metadata.put("documentType", "JD");
         metadata.put("jdId", jdId.toString());
         metadata.put("contentType", contentType);
 
-        // Stable ID prevents duplicate documents when the same JD
-        // is processed again.
-        String documentId = UUID.nameUUIDFromBytes(
-                (jdId + "_" + contentType)
-                        .getBytes(StandardCharsets.UTF_8))
-                .toString();
+        // JD
+        String documentId = createDocumentId(jdId, "JD", contentType);
 
         documents.add(new Document(
                 documentId,
@@ -288,180 +297,260 @@ public class EmbeddingService {
     }
 
     /**
-     * Tạo nội dung tóm tắt từ một JSON.
-     * 
-     * @param cv
-     * @return
+     * Tạo nội dung tóm tắt từ CV.
      */
     private String buildSummaryContent(JsonNode cv) {
         StringBuilder content = new StringBuilder();
 
         appendField(content, "Professional summary", cv.path("summary"));
 
-        return content.toString();
+        return content.toString().trim();
     }
 
     /**
-     * Tạo nội dung giáo dục từ một mảng JSON.
-     * 
-     * @param education
-     * @return
+     * Tạo nội dung giáo dục từ CV.
+     * Chỉ tạo document khi có thông tin thực tế.
      */
     private String buildEducationContent(JsonNode education) {
-        StringBuilder content = new StringBuilder();
-        content.append("Education:\n");
-
-        if (!education.isArray()) {
+        if (education == null || !education.isArray()) {
             return "";
         }
+
+        StringBuilder body = new StringBuilder();
 
         for (JsonNode item : education) {
-            appendField(content, "School", item.path("school"));
-            appendField(content, "Degree", item.path("degree"));
-            appendField(content, "Major", item.path("major"));
-            appendField(content, "Start date", item.path("startDate"));
-            appendField(content, "End date", item.path("endDate"));
-            appendField(content, "GPA", item.path("gpa"));
-            appendTextArray(content, "Details", item.path("details"));
-            content.append("\n");
+            if (!item.isObject()) {
+                continue;
+            }
+
+            StringBuilder itemContent = new StringBuilder();
+
+            appendField(itemContent, "School", item.path("school"));
+            appendField(itemContent, "Degree", item.path("degree"));
+
+            // Major là thông tin quan trọng trong nghiên cứu CV-JD.
+            appendField(itemContent, "Major", item.path("major"));
+
+            appendField(itemContent, "Start date", item.path("startDate"));
+            appendField(itemContent, "End date", item.path("endDate"));
+            appendField(itemContent, "GPA", item.path("gpa"));
+
+            appendTextArray(
+                    itemContent,
+                    "Details",
+                    item.path("details"));
+
+            if (!itemContent.isEmpty()) {
+                body.append(itemContent).append("\n");
+            }
         }
 
-        return content.toString();
+        return buildSectionContent("Education", body);
     }
 
     /**
-     * Tạo nội dung kinh nghiệm làm việc từ một mảng JSON.
-     * 
-     * @param experience
-     * @return
+     * Tạo nội dung kinh nghiệm làm việc từ CV.
+     * Giữ riêng từng kinh nghiệm và bằng chứng kỹ thuật.
      */
     private String buildExperienceContent(JsonNode experience) {
-        StringBuilder content = new StringBuilder();
-        content.append("Professional experience:\n");
-
-        if (!experience.isArray()) {
+        if (experience == null || !experience.isArray()) {
             return "";
         }
+
+        StringBuilder body = new StringBuilder();
 
         for (JsonNode item : experience) {
-            appendField(content, "Company", item.path("company"));
-            appendField(content, "Position", item.path("position"));
-            appendField(content, "Employment type", item.path("employmentType"));
-            appendField(content, "Start date", item.path("startDate"));
-            appendField(content, "End date", item.path("endDate"));
-            appendTextArray(content, "Responsibilities and achievements",
+            if (!item.isObject()) {
+                continue;
+            }
+
+            StringBuilder itemContent = new StringBuilder();
+
+            appendField(itemContent, "Company", item.path("company"));
+            appendField(itemContent, "Position", item.path("position"));
+            appendField(
+                    itemContent,
+                    "Employment type",
+                    item.path("employmentType"));
+            appendField(itemContent, "Start date", item.path("startDate"));
+            appendField(itemContent, "End date", item.path("endDate"));
+
+            // Giữ nguyên mô tả nhiệm vụ, trách nhiệm và thành tựu.
+            appendTextArray(
+                    itemContent,
+                    "Responsibilities and achievements",
                     item.path("description"));
-            appendTextArray(content, "Technologies", item.path("technologies"));
-            content.append("\n");
+
+            // Giữ danh sách công nghệ riêng với phần mô tả.
+            appendTextArray(
+                    itemContent,
+                    "Technologies",
+                    item.path("technologies"));
+
+            if (!itemContent.isEmpty()) {
+                body.append(itemContent).append("\n");
+            }
         }
 
-        return content.toString();
+        return buildSectionContent("Professional experience", body);
     }
 
     /**
-     * Tạo nội dung dự án từ một mảng JSON.
-     * 
-     * @param projects
-     * @return
+     * Tạo nội dung dự án từ CV.
+     * Giữ riêng mô tả và công nghệ của từng dự án.
      */
     private String buildProjectsContent(JsonNode projects) {
-        StringBuilder content = new StringBuilder();
-        content.append("Projects:\n");
-
-        if (!projects.isArray()) {
+        if (projects == null || !projects.isArray()) {
             return "";
         }
 
+        StringBuilder body = new StringBuilder();
+
         for (JsonNode item : projects) {
-            appendField(content, "Project name", item.path("name"));
-            appendField(content, "Role", item.path("role"));
-            appendField(content, "Start date", item.path("startDate"));
-            appendField(content, "End date", item.path("endDate"));
-            appendTextArray(content, "Project description", item.path("description"));
-            appendTextArray(content, "Technologies", item.path("technologies"));
-            content.append("\n");
+            if (!item.isObject()) {
+                continue;
+            }
+
+            StringBuilder itemContent = new StringBuilder();
+
+            appendField(itemContent, "Project name", item.path("name"));
+            appendField(itemContent, "Role", item.path("role"));
+            appendField(itemContent, "Start date", item.path("startDate"));
+            appendField(itemContent, "End date", item.path("endDate"));
+            appendField(itemContent, "Project URL", item.path("url"));
+
+            appendTextArray(
+                    itemContent,
+                    "Project description",
+                    item.path("description"));
+
+            appendTextArray(
+                    itemContent,
+                    "Technologies",
+                    item.path("technologies"));
+
+            if (!itemContent.isEmpty()) {
+                body.append(itemContent).append("\n");
+            }
         }
 
-        return content.toString();
+        return buildSectionContent("Projects", body);
     }
 
     /**
-     * Tạo nội dung kỹ năng từ một mảng JSON.
-     * 
-     * @param skills
-     * @return
+     * Tạo nội dung kỹ năng từ CV.
      */
     private String buildCVSkillsContent(JsonNode skills) {
-        StringBuilder content = new StringBuilder();
-        content.append("Candidate skills:\n");
-
-        if (!skills.isArray()) {
+        if (skills == null || !skills.isArray()) {
             return "";
         }
 
+        StringBuilder body = new StringBuilder();
+
         for (JsonNode skill : skills) {
-            String name = skill.path("name").asText("");
+            if (!skill.isObject()) {
+                continue;
+            }
+
+            String name = skill.path("name").asText("").trim();
+
             if (name.isBlank()) {
                 continue;
             }
 
-            content.append("- ")
-                    .append(name.trim())
-                    .append(" | Category: ")
-                    .append(skill.path("category").asText("OTHER"))
-                    .append(" | Level: ")
-                    .append(skill.path("level").asText("Not specified"))
-                    .append("\n");
+            StringBuilder skillContent = new StringBuilder("- ")
+                    .append(name);
+
+            String category = skill.path("category").asText("").trim();
+            String level = skill.path("level").asText("").trim();
+
+            if (!category.isBlank()) {
+                skillContent.append(" | Category: ")
+                        .append(category);
+            }
+
+            if (!level.isBlank()) {
+                skillContent.append(" | Level: ")
+                        .append(level);
+            }
+
+            body.append(skillContent).append("\n");
         }
 
-        return content.toString();
+        return buildSectionContent("Candidate skills", body);
     }
 
     /**
-     * Tạo nội dung chứng chỉ từ một mảng JSON.
-     * 
-     * @param certifications
-     * @return
+     * Tạo nội dung chứng chỉ từ CV.
      */
     private String buildCertificationsContent(JsonNode certifications) {
-        StringBuilder content = new StringBuilder();
-        content.append("Certifications:\n");
-
-        if (!certifications.isArray()) {
+        if (certifications == null || !certifications.isArray()) {
             return "";
         }
 
+        StringBuilder body = new StringBuilder();
+
         for (JsonNode item : certifications) {
-            appendField(content, "Certification", item.path("name"));
-            appendField(content, "Issuer", item.path("issuer"));
-            appendField(content, "Date", item.path("date"));
-            content.append("\n");
+            if (!item.isObject()) {
+                continue;
+            }
+
+            StringBuilder itemContent = new StringBuilder();
+
+            appendField(itemContent, "Certification", item.path("name"));
+            appendField(itemContent, "Issuer", item.path("issuer"));
+            appendField(itemContent, "Date", item.path("date"));
+
+            if (!itemContent.isEmpty()) {
+                body.append(itemContent).append("\n");
+            }
         }
 
-        return content.toString();
+        return buildSectionContent("Certifications", body);
     }
 
     /**
-     * Tạo nội dung ngôn ngữ từ một mảng JSON.
-     * 
-     * @param languages
-     * @return
+     * Tạo nội dung ngôn ngữ từ CV.
      */
     private String buildLanguagesContent(JsonNode languages) {
-        StringBuilder content = new StringBuilder();
-        content.append("Languages:\n");
-
-        if (!languages.isArray()) {
+        if (languages == null || !languages.isArray()) {
             return "";
         }
 
+        StringBuilder body = new StringBuilder();
+
         for (JsonNode item : languages) {
-            appendField(content, "Language", item.path("name"));
-            appendField(content, "Proficiency", item.path("proficiency"));
-            content.append("\n");
+            if (!item.isObject()) {
+                continue;
+            }
+
+            StringBuilder itemContent = new StringBuilder();
+
+            appendField(itemContent, "Language", item.path("name"));
+            appendField(
+                    itemContent,
+                    "Proficiency",
+                    item.path("proficiency"));
+
+            if (!itemContent.isEmpty()) {
+                body.append(itemContent).append("\n");
+            }
         }
 
-        return content.toString();
+        return buildSectionContent("Languages", body);
+    }
+
+    /**
+     * Chỉ thêm tiêu đề section khi section có nội dung thực tế.
+     */
+    private String buildSectionContent(
+            String title,
+            StringBuilder body) {
+        if (body == null || body.isEmpty()) {
+            return "";
+        }
+
+        return title + ":\n" + body.toString().trim();
     }
 
     /**
@@ -471,23 +560,40 @@ public class EmbeddingService {
      * @param label
      * @param values
      */
+
     private void appendTextArray(
             StringBuilder content,
             String label,
             JsonNode values) {
-
-        if (!values.isArray() || values.isEmpty()) {
+        if (content == null
+                || values == null
+                || !values.isArray()) {
             return;
         }
 
-        content.append(label).append(":\n");
+        StringBuilder items = new StringBuilder();
 
         for (JsonNode value : values) {
-            if (value.isTextual() && !value.asText().isBlank()) {
-                content.append("- ")
-                        .append(value.asText().trim())
-                        .append("\n");
+            if (value == null || !value.isTextual()) {
+                continue;
             }
+
+            String text = value.asText().trim();
+
+            if (text.isBlank()) {
+                continue;
+            }
+
+            items.append("- ")
+                    .append(text)
+                    .append("\n");
+        }
+
+        // Chỉ thêm label nếu có ít nhất một phần tử hợp lệ.
+        if (!items.isEmpty()) {
+            content.append(label)
+                    .append(":\n")
+                    .append(items);
         }
     }
 
@@ -514,7 +620,7 @@ public class EmbeddingService {
         metadata.put("cvId", cvId.toString());
         metadata.put("contentType", contentType);
 
-        String documentId = createDocumentId(cvId, contentType);
+        String documentId = createDocumentId(cvId, "CV", contentType);
 
         documents.add(new Document(documentId, content, metadata));
     }
@@ -551,9 +657,13 @@ public class EmbeddingService {
      * @param contentType
      * @return
      */
-    private String createDocumentId(UUID entityId, String contentType) {
+    private String createDocumentId(
+            UUID entityId,
+            String documentType,
+            String contentType) {
+
         return UUID.nameUUIDFromBytes(
-                (entityId + "_" + contentType)
+                (documentType + "_" + entityId + "_" + contentType)
                         .getBytes(StandardCharsets.UTF_8))
                 .toString();
     }

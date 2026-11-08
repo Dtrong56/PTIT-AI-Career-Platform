@@ -1,9 +1,11 @@
+
 package com.ptit.ai_engine_service.service.normalization.cv;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.ptit.ai_engine_service.service.normalization.skill.SkillNormalizationService;
 import org.springframework.stereotype.Service;
 
 import java.util.HashSet;
@@ -14,368 +16,393 @@ import java.util.Set;
 public class CVNormalizationService {
 
     private final ObjectMapper objectMapper;
+    private final SkillNormalizationService skillNormalizationService;
 
-    public CVNormalizationService(ObjectMapper objectMapper) {
+    // private static final Set<String> VALID_SKILL_CATEGORIES = Set.of(
+    // "PROGRAMMING_LANGUAGE",
+    // "FRAMEWORK",
+    // "DATABASE",
+    // "TOOL",
+    // "PLATFORM",
+    // "RUNTIME",
+    // "SOFT_SKILL",
+    // "OTHER");
+
+    public CVNormalizationService(
+            ObjectMapper objectMapper,
+            SkillNormalizationService skillNormalizationService) {
         this.objectMapper = objectMapper;
+        this.skillNormalizationService = skillNormalizationService;
     }
 
-    /**
-     * Chuẩn hóa dữ liệu JSON trích xuất từ CV.
-     * 
-     * @param extractedJson
-     * @return
-     * @throws Exception
-     *                   Các bước chuẩn hóa dữ liệu:
-     *                   0. Kiểm tra dữ liệu đầu vào có hợp lệ hay không.
-     *                   1. Loại bỏ các ký tự Markdown code fences nếu có.
-     *                   2. Kiểm tra dữ liệu JSON có hợp lệ hay không.
-     *                   3. Chuẩn hóa các trường dữ liệu trong JSON:
-     *                   - personalInfo: Chuẩn hóa các trường thông tin cá nhân.
-     *                   - summary: Chuẩn hóa trường tóm tắt.
-     *                   - education: Chuẩn hóa danh sách các trường học.
-     *                   - experience: Chuẩn hóa danh sách các kinh nghiệm làm việc.
-     *                   - projects: Chuẩn hóa danh sách các dự án.
-     *                   - skills: Chuẩn hóa danh sách các kỹ năng.
-     *                   - certifications: Chuẩn hóa danh sách các chứng chỉ.
-     *                   - languages: Chuẩn hóa danh sách các ngôn ngữ.
-     *                   4. Trả về dữ liệu JSON đã chuẩn hóa.
-     */
-    public String normalize(String extractedJson) throws Exception {
-
-        // 0. Kiểm tra dữ liệu đầu vào có hợp lệ hay không.
-        if (extractedJson == null || extractedJson.isBlank()) {
+    public String normalize(String structuredJson) {
+        if (structuredJson == null || structuredJson.isBlank()) {
             throw new IllegalArgumentException(
-                    "CV extracted JSON must not be empty.");
+                    "Structured CV JSON must not be empty.");
         }
 
-        String json = extractedJson.trim();
+        try {
+            String cleanedJson = removeMarkdownFence(structuredJson);
 
-        // 1. Loại bỏ các ký tự Markdown code fences nếu có.
-        if (json.startsWith("```")) {
-            json = json.replaceFirst("^```(?:json)?\\s*", "");
-            json = json.replaceFirst("\\s*```$", "");
+            JsonNode source = objectMapper.readTree(cleanedJson);
+
+            if (source == null || !source.isObject()) {
+                throw new IllegalArgumentException(
+                        "Structured CV must be a JSON object.");
+            }
+
+            ObjectNode result = objectMapper.createObjectNode();
+
+            result.set("personalInfo", normalizePersonalInfo(source));
+            result.put("summary", normalizeText(source.path("summary")));
+
+            result.set("education", normalizeEducation(source));
+            result.set("experience", normalizeExperience(source));
+            result.set("projects", normalizeProjects(source));
+            result.set("skills", normalizeSkills(source));
+            result.set("certifications", normalizeCertifications(source));
+            result.set("languages", normalizeLanguages(source));
+
+            validateNormalizedData(result);
+
+            return objectMapper.writeValueAsString(result);
+
+        } catch (IllegalArgumentException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new IllegalStateException(
+                    "Failed to normalize CV data: " + e.getMessage(),
+                    e);
         }
-
-        // 2. Kiểm tra dữ liệu JSON có hợp lệ hay không.
-        JsonNode source = objectMapper.readTree(json);
-
-        if (source == null || !source.isObject()) {
-            throw new IllegalArgumentException(
-                    "CV extraction result must be a JSON object.");
-        }
-
-        // 3. Chuẩn hóa các trường dữ liệu trong JSON.
-        ObjectNode result = objectMapper.createObjectNode();
-
-        result.set(
-                "personalInfo",
-                normalizePersonalInfo(source.path("personalInfo")));
-
-        result.put(
-                "summary",
-                normalizeText(source.path("summary")));
-
-        result.set(
-                "education",
-                normalizeEducation(source.path("education")));
-
-        result.set(
-                "experience",
-                normalizeExperience(source.path("experience")));
-
-        result.set(
-                "projects",
-                normalizeProjects(source.path("projects")));
-
-        result.set(
-                "skills",
-                normalizeSkills(source.path("skills")));
-
-        result.set(
-                "certifications",
-                normalizeCertifications(source.path("certifications")));
-
-        result.set(
-                "languages",
-                normalizeLanguages(source.path("languages")));
-
-        // 4. Trả về dữ liệu JSON đã chuẩn hóa.
-        return objectMapper.writeValueAsString(result);
     }
 
-    /**
-     * Chuẩn hóa thông tin cá nhân.
-     * 
-     * @param source
-     * @return
-     */
+    private String removeMarkdownFence(String json) {
+        String cleaned = json.trim();
+
+        if (cleaned.startsWith("```json")) {
+            cleaned = cleaned.substring(7);
+        } else if (cleaned.startsWith("```")) {
+            cleaned = cleaned.substring(3);
+        }
+
+        if (cleaned.endsWith("```")) {
+            cleaned = cleaned.substring(0, cleaned.length() - 3);
+        }
+
+        return cleaned.trim();
+    }
+
+    // --------------------------------------------------
+    // PERSONAL INFORMATION
+    // --------------------------------------------------
+
     private ObjectNode normalizePersonalInfo(JsonNode source) {
+        JsonNode personalInfo = source.path("personalInfo");
 
         ObjectNode result = objectMapper.createObjectNode();
 
-        result.put("fullName", normalizeText(source.path("fullName")));
-        result.put("email", normalizeText(source.path("email")));
-        result.put("phone", normalizeText(source.path("phone")));
-        result.put("address", normalizeText(source.path("address")));
-        result.put("linkedin", normalizeText(source.path("linkedin")));
-        result.put("github", normalizeText(source.path("github")));
-        result.put("portfolio", normalizeText(source.path("portfolio")));
+        result.put("fullName", normalizeText(personalInfo.path("fullName")));
+        result.put("email", normalizeText(personalInfo.path("email")));
+        result.put("phone", normalizeText(personalInfo.path("phone")));
+        result.put("address", normalizeText(personalInfo.path("address")));
+        result.put("linkedin", normalizeText(personalInfo.path("linkedin")));
+        result.put("github", normalizeText(personalInfo.path("github")));
+        result.put("portfolio", normalizeText(personalInfo.path("portfolio")));
 
         return result;
     }
 
-    /**
-     * Chuẩn hóa danh sách các trường học.
-     * 
-     * @param source
-     * @return
-     */
-    private ArrayNode normalizeEducation(JsonNode source) {
+    // --------------------------------------------------
+    // EDUCATION
+    // --------------------------------------------------
 
+    private ArrayNode normalizeEducation(JsonNode source) {
         ArrayNode result = objectMapper.createArrayNode();
 
-        if (!source.isArray()) {
+        JsonNode education = source.path("education");
+
+        if (!education.isArray()) {
             return result;
         }
 
-        for (JsonNode item : source) {
+        for (JsonNode item : education) {
+            if (!item.isObject()) {
+                continue;
+            }
 
-            ObjectNode education = objectMapper.createObjectNode();
+            ObjectNode normalized = objectMapper.createObjectNode();
 
-            education.put("school", normalizeText(item.path("school")));
-            education.put("degree", normalizeText(item.path("degree")));
-            education.put("major", normalizeText(item.path("major")));
-            education.put("startDate", normalizeText(item.path("startDate")));
-            education.put("endDate", normalizeText(item.path("endDate")));
-            education.put("gpa", normalizeText(item.path("gpa")));
+            normalized.put("school", normalizeText(item.path("school")));
+            normalized.put("degree", normalizeText(item.path("degree")));
+            normalized.put("major", normalizeText(item.path("major")));
+            normalized.put("startDate", normalizeText(item.path("startDate")));
+            normalized.put("endDate", normalizeText(item.path("endDate")));
+            normalized.put("gpa", normalizeText(item.path("gpa")));
 
-            education.set(
+            normalized.set(
                     "details",
                     normalizeStringArray(item.path("details")));
 
-            result.add(education);
+            result.add(normalized);
         }
 
         return result;
     }
 
-    /**
-     * Chuẩn hóa danh sách các kinh nghiệm làm việc.
-     * 
-     * @param source
-     * @return
-     */
-    private ArrayNode normalizeExperience(JsonNode source) {
+    // --------------------------------------------------
+    // EXPERIENCE
+    // --------------------------------------------------
 
+    private ArrayNode normalizeExperience(JsonNode source) {
         ArrayNode result = objectMapper.createArrayNode();
 
-        if (!source.isArray()) {
+        JsonNode experiences = source.path("experience");
+
+        if (!experiences.isArray()) {
             return result;
         }
 
-        for (JsonNode item : source) {
+        for (JsonNode item : experiences) {
+            if (!item.isObject()) {
+                continue;
+            }
 
-            ObjectNode experience = objectMapper.createObjectNode();
+            ObjectNode normalized = objectMapper.createObjectNode();
 
-            experience.put("company", normalizeText(item.path("company")));
-            experience.put("position", normalizeText(item.path("position")));
-            experience.put(
+            normalized.put("company", normalizeText(item.path("company")));
+            normalized.put("position", normalizeText(item.path("position")));
+            normalized.put(
                     "employmentType",
                     normalizeText(item.path("employmentType")));
+            normalized.put("startDate", normalizeText(item.path("startDate")));
+            normalized.put("endDate", normalizeText(item.path("endDate")));
 
-            experience.put("startDate", normalizeText(item.path("startDate")));
-            experience.put("endDate", normalizeText(item.path("endDate")));
-
-            experience.set(
+            // Giữ nguyên nội dung mô tả đã được làm sạch về khoảng trắng.
+            // Không thay thế công nghệ trong mô tả bằng tên chuẩn hóa.
+            normalized.set(
                     "description",
                     normalizeStringArray(item.path("description")));
 
-            experience.set(
+            // Chuẩn hóa danh sách công nghệ được trích xuất riêng.
+            normalized.set(
                     "technologies",
                     normalizeStringArray(item.path("technologies")));
 
-            result.add(experience);
+            result.add(normalized);
         }
 
         return result;
     }
 
-    /**
-     * Chuẩn hóa danh sách các dự án.
-     * 
-     * @param source
-     * @return
-     */
+    // --------------------------------------------------
+    // PROJECTS
+    // --------------------------------------------------
+
     private ArrayNode normalizeProjects(JsonNode source) {
-
         ArrayNode result = objectMapper.createArrayNode();
 
-        if (!source.isArray()) {
+        JsonNode projects = source.path("projects");
+
+        if (!projects.isArray()) {
             return result;
         }
 
-        for (JsonNode item : source) {
+        for (JsonNode item : projects) {
+            if (!item.isObject()) {
+                continue;
+            }
 
-            ObjectNode project = objectMapper.createObjectNode();
+            ObjectNode normalized = objectMapper.createObjectNode();
 
-            project.put("name", normalizeText(item.path("name")));
-            project.put("role", normalizeText(item.path("role")));
-            project.put("startDate", normalizeText(item.path("startDate")));
-            project.put("endDate", normalizeText(item.path("endDate")));
-            project.put("url", normalizeText(item.path("url")));
+            normalized.put("name", normalizeText(item.path("name")));
+            normalized.put("role", normalizeText(item.path("role")));
+            normalized.put("startDate", normalizeText(item.path("startDate")));
+            normalized.put("endDate", normalizeText(item.path("endDate")));
+            normalized.put("url", normalizeText(item.path("url")));
 
-            project.set(
+            // Không tóm tắt hoặc xóa bằng chứng kỹ thuật trong mô tả.
+            normalized.set(
                     "description",
                     normalizeStringArray(item.path("description")));
 
-            project.set(
+            normalized.set(
                     "technologies",
                     normalizeStringArray(item.path("technologies")));
 
-            result.add(project);
+            result.add(normalized);
         }
 
         return result;
     }
 
-    /**
-     * Chuẩn hóa danh sách các kỹ năng.
-     * 
-     * @param source
-     * @return
-     */
+    // --------------------------------------------------
+    // SKILLS
+    // --------------------------------------------------
+
     private ArrayNode normalizeSkills(JsonNode source) {
-
         ArrayNode result = objectMapper.createArrayNode();
-        Set<String> uniqueSkills = new HashSet<>();
 
-        if (!source.isArray()) {
+        JsonNode skills = source.path("skills");
+
+        if (!skills.isArray()) {
             return result;
         }
 
-        for (JsonNode item : source) {
+        Set<String> processedNames = new HashSet<>();
 
-            String name = normalizeText(item.path("name"));
-
-            if (name == null) {
+        for (JsonNode item : skills) {
+            if (!item.isObject()) {
                 continue;
             }
 
-            name = normalizeSkillName(name);
+            String extractedName = normalizeText(item.path("name"));
 
-            String key = name.toLowerCase(Locale.ROOT);
-
-            if (!uniqueSkills.add(key)) {
+            if (extractedName == null) {
                 continue;
             }
 
-            String category = normalizeText(item.path("category"));
+            String extractedCategory = normalizeCategory(
+                    normalizeText(item.path("category")));
 
-            if (category == null) {
-                category = "OTHER";
-            } else {
-                category = category.toUpperCase(Locale.ROOT);
+            SkillNormalizationService.NormalizedSkill normalizedSkill = skillNormalizationService.normalize(
+                    extractedName,
+                    extractedCategory);
+
+            if (normalizedSkill == null
+                    || normalizedSkill.name() == null
+                    || normalizedSkill.name().isBlank()) {
+                continue;
             }
 
-            if (!isValidSkillCategory(category)) {
+            String normalizedName = normalizedSkill.name().trim();
+
+            // Chỉ loại bỏ kỹ năng trùng trong danh sách skills[].
+            // Không ảnh hưởng đến technologies[] hoặc description[]
+            // trong từng Experience và Project.
+            String uniqueKey = normalizedName.toLowerCase(Locale.ROOT);
+
+            if (!processedNames.add(uniqueKey)) {
+                continue;
+            }
+
+            String category = normalizedSkill.category();
+
+            if (category == null || category.isBlank()) {
                 category = "OTHER";
             }
 
-            ObjectNode skill = objectMapper.createObjectNode();
+            ObjectNode normalized = objectMapper.createObjectNode();
 
-            skill.put("name", name);
-            skill.put("category", category);
-            skill.put("level", normalizeText(item.path("level")));
+            normalized.put("name", normalizedName);
+            normalized.put("category", category);
+            normalized.put("level", normalizeText(item.path("level")));
 
-            result.add(skill);
+            result.add(normalized);
         }
 
         return result;
     }
 
-    /**
-     * Chuẩn hóa danh sách các chứng chỉ.
-     * 
-     * @param source
-     * @return
-     */
+    private String normalizeCategory(String category) {
+        if (category == null || category.isBlank()) {
+            return "OTHER";
+        }
+
+        String normalized = category.trim().toUpperCase(Locale.ROOT);
+
+        // if (!VALID_SKILL_CATEGORIES.contains(normalized)) {
+        // return "OTHER";
+        // }
+
+        return normalized;
+    }
+
+    // --------------------------------------------------
+    // CERTIFICATIONS
+    // --------------------------------------------------
+
     private ArrayNode normalizeCertifications(JsonNode source) {
-
         ArrayNode result = objectMapper.createArrayNode();
 
-        if (!source.isArray()) {
+        JsonNode certifications = source.path("certifications");
+
+        if (!certifications.isArray()) {
             return result;
         }
 
-        for (JsonNode item : source) {
+        for (JsonNode item : certifications) {
+            if (!item.isObject()) {
+                continue;
+            }
 
-            ObjectNode certification = objectMapper.createObjectNode();
+            ObjectNode normalized = objectMapper.createObjectNode();
 
-            certification.put("name", normalizeText(item.path("name")));
-            certification.put("issuer", normalizeText(item.path("issuer")));
-            certification.put("date", normalizeText(item.path("date")));
+            normalized.put("name", normalizeText(item.path("name")));
+            normalized.put("issuer", normalizeText(item.path("issuer")));
+            normalized.put("date", normalizeText(item.path("date")));
 
-            result.add(certification);
+            result.add(normalized);
         }
 
         return result;
     }
 
-    /**
-     * Chuẩn hóa danh sách các ngôn ngữ.
-     * 
-     * @param source
-     * @return
-     */
-    private ArrayNode normalizeLanguages(JsonNode source) {
+    // --------------------------------------------------
+    // LANGUAGES
+    // --------------------------------------------------
 
+    private ArrayNode normalizeLanguages(JsonNode source) {
         ArrayNode result = objectMapper.createArrayNode();
 
-        if (!source.isArray()) {
+        JsonNode languages = source.path("languages");
+
+        if (!languages.isArray()) {
             return result;
         }
 
-        for (JsonNode item : source) {
+        for (JsonNode item : languages) {
+            if (!item.isObject()) {
+                continue;
+            }
 
-            ObjectNode language = objectMapper.createObjectNode();
+            ObjectNode normalized = objectMapper.createObjectNode();
 
-            language.put("name", normalizeText(item.path("name")));
-            language.put(
+            normalized.put("name", normalizeText(item.path("name")));
+            normalized.put(
                     "proficiency",
                     normalizeText(item.path("proficiency")));
 
-            result.add(language);
+            result.add(normalized);
         }
 
         return result;
     }
 
-    /**
-     * Chuẩn hóa danh sách các chuỗi.
-     * 
-     * @param source
-     * @return
-     */
-    private ArrayNode normalizeStringArray(JsonNode source) {
+    // --------------------------------------------------
+    // COMMON NORMALIZATION
+    // --------------------------------------------------
 
+    private ArrayNode normalizeStringArray(JsonNode source) {
         ArrayNode result = objectMapper.createArrayNode();
-        Set<String> uniqueValues = new HashSet<>();
 
         if (!source.isArray()) {
             return result;
         }
 
-        for (JsonNode item : source) {
+        Set<String> processedValues = new HashSet<>();
 
+        for (JsonNode item : source) {
             String value = normalizeText(item);
 
             if (value == null) {
                 continue;
             }
 
-            String key = value.toLowerCase(Locale.ROOT);
+            // Chỉ loại bỏ chuỗi trùng chính xác sau khi chuẩn hóa
+            // khoảng trắng và không phân biệt chữ hoa/thường.
+            String uniqueKey = value.toLowerCase(Locale.ROOT);
 
-            if (uniqueValues.add(key)) {
+            if (processedValues.add(uniqueKey)) {
                 result.add(value);
             }
         }
@@ -383,64 +410,90 @@ public class CVNormalizationService {
         return result;
     }
 
-    /**
-     * Chuẩn hóa tên kỹ năng.
-     * 
-     * @param name
-     * @return
-     */
-    private String normalizeSkillName(String name) {
-
-        String normalized = name.trim().replaceAll("\\s+", " ");
-
-        return switch (normalized.toLowerCase(Locale.ROOT)) {
-            case "springboot" -> "Spring Boot";
-            case "postgres sql", "postgresql database" -> "PostgreSQL";
-            case "nodejs", "node js" -> "Node.js";
-            case "reactjs", "react js" -> "React";
-            case "vuejs", "vue js" -> "Vue.js";
-            default -> normalized;
-        };
-    }
-
-    /**
-     * Kiểm tra xem danh mục kỹ năng có hợp lệ không.
-     * 
-     * @param category
-     * @return
-     */
-    private boolean isValidSkillCategory(String category) {
-
-        return switch (category) {
-            case "PROGRAMMING_LANGUAGE",
-                    "FRAMEWORK",
-                    "DATABASE",
-                    "TOOL",
-                    "PLATFORM",
-                    "SOFT_SKILL",
-                    "OTHER" ->
-                true;
-            default -> false;
-        };
-    }
-
-    /**
-     * Chuẩn hóa chuỗi văn bản.
-     * 
-     * @param node
-     * @return
-     */
     private String normalizeText(JsonNode node) {
-
-        if (node == null || node.isMissingNode()
-                || node.isNull() || !node.isValueNode()) {
+        if (node == null || node.isNull() || !node.isValueNode()) {
             return null;
         }
 
-        String value = node.asText()
-                .trim()
-                .replaceAll("\\s+", " ");
+        String value = node.asText();
 
-        return value.isBlank() ? null : value;
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+
+        return value.trim().replaceAll("\\s+", " ");
+    }
+
+    // --------------------------------------------------
+    // OUTPUT VALIDATION
+    // --------------------------------------------------
+
+    private void validateNormalizedData(ObjectNode data) {
+        validateArray(data, "education");
+        validateArray(data, "experience");
+        validateArray(data, "projects");
+        validateArray(data, "skills");
+        validateArray(data, "certifications");
+        validateArray(data, "languages");
+
+        validateObjectArray(data, "education");
+        validateObjectArray(data, "experience");
+        validateObjectArray(data, "projects");
+        validateObjectArray(data, "skills");
+        validateObjectArray(data, "certifications");
+        validateObjectArray(data, "languages");
+
+        validateNestedStringArray(data, "education", "details");
+
+        validateNestedStringArray(data, "experience", "description");
+        validateNestedStringArray(data, "experience", "technologies");
+
+        validateNestedStringArray(data, "projects", "description");
+        validateNestedStringArray(data, "projects", "technologies");
+    }
+
+    private void validateArray(ObjectNode data, String fieldName) {
+        if (!data.path(fieldName).isArray()) {
+            throw new IllegalStateException(
+                    "Invalid normalized CV field: "
+                            + fieldName + " must be an array.");
+        }
+    }
+
+    private void validateObjectArray(ObjectNode data, String fieldName) {
+        JsonNode array = data.path(fieldName);
+
+        for (JsonNode item : array) {
+            if (!item.isObject()) {
+                throw new IllegalStateException(
+                        "Invalid item in CV field: " + fieldName);
+            }
+        }
+    }
+
+    private void validateNestedStringArray(
+            ObjectNode data,
+            String parentField,
+            String childField) {
+        JsonNode parentArray = data.path(parentField);
+
+        for (JsonNode item : parentArray) {
+            JsonNode childArray = item.path(childField);
+
+            if (!childArray.isArray()) {
+                throw new IllegalStateException(
+                        "Invalid CV field: "
+                                + parentField + "." + childField
+                                + " must be an array.");
+            }
+
+            for (JsonNode value : childArray) {
+                if (!value.isTextual()) {
+                    throw new IllegalStateException(
+                            "Invalid value in CV field: "
+                                    + parentField + "." + childField);
+                }
+            }
+        }
     }
 }
