@@ -1,39 +1,27 @@
 package com.ptit.ai_engine_service.service.scoring;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ptit.ai_engine_service.dto.request.CVAnalysisRequest;
 import com.ptit.ai_engine_service.dto.response.CVAnalysisResult;
-import com.ptit.ai_engine_service.service.embedding.EmbeddingService;
+import com.ptit.ai_engine_service.service.similarity.SimilarityService;
 import com.ptit.ai_engine_service.service.skillgap.SkillGapService;
-import com.ptit.ai_engine_service.vector.service.CVVectorService;
-import com.ptit.ai_engine_service.vector.service.JDVectorService;
-
-import org.springframework.ai.document.Document;
 import org.springframework.stereotype.Service;
-
-import java.util.List;
 
 @Service
 public class CVJDAnalysisService {
 
-    private final EmbeddingService embeddingService;
-    private final CVVectorService cvVectorService;
-    private final JDVectorService jdVectorService;
-
+    private final ObjectMapper objectMapper;
     private final SimilarityService similarityService;
     private final SkillGapService skillGapService;
     private final MatchScoreCalculator matchScoreCalculator;
 
     public CVJDAnalysisService(
-            EmbeddingService embeddingService,
-            CVVectorService cvVectorService,
-            JDVectorService jdVectorService,
+            ObjectMapper objectMapper,
             SimilarityService similarityService,
             SkillGapService skillGapService,
             MatchScoreCalculator matchScoreCalculator) {
-
-        this.embeddingService = embeddingService;
-        this.cvVectorService = cvVectorService;
-        this.jdVectorService = jdVectorService;
+        this.objectMapper = objectMapper;
         this.similarityService = similarityService;
         this.skillGapService = skillGapService;
         this.matchScoreCalculator = matchScoreCalculator;
@@ -44,57 +32,32 @@ public class CVJDAnalysisService {
 
         validateRequest(request);
 
-        // 1. Create CV documents
-        List<Document> cvDocuments = embeddingService.createCVDocuments(
-                request.cvId(),
-                request.structuredCv());
+        // 1. Parse structured JD to determine whether it contains skills.
+        JsonNode jd = objectMapper.readTree(request.structuredJd());
 
-        // 2. Create JD documents
-        List<Document> jdDocuments = embeddingService.createJDDocuments(
-                request.jdId(),
+        boolean hasSkills = hasValidSkills(jd);
+
+        // 2. Calculate semantic similarity.
+        SimilarityService.SimilarityResult similarityResult = similarityService.calculateSimilarity(
+                request.structuredCv(),
                 request.structuredJd());
 
-        if (cvDocuments.isEmpty()) {
-            throw new IllegalArgumentException(
-                    "No valid CV documents found.");
-        }
+        double semanticScore = similarityResult.semanticScore();
 
-        if (jdDocuments.isEmpty()) {
-            throw new IllegalArgumentException(
-                    "No valid JD documents found.");
-        }
-
-        // 3. Save embeddings to Qdrant
-        cvVectorService.saveCVVectors(
-                request.cvId(),
-                cvDocuments);
-
-        jdVectorService.saveJDVectors(
-                request.jdId(),
-                jdDocuments);
-
-        // 4. Build semantic content
-        String cvContent = combineDocuments(cvDocuments);
-        String jdContent = combineDocuments(jdDocuments);
-
-        // 5. Calculate semantic score
-        double semanticScore = similarityService.calculateSemanticScore(
-                cvContent,
-                jdContent);
-
-        // 6. Analyze skill gaps
+        // 3. Analyze skill gaps.
         SkillGapService.Result skillResult = skillGapService.analyze(
                 request.structuredCv(),
                 request.structuredJd());
 
         double skillScore = skillResult.skillScore();
 
-        // 7. Calculate final match score
+        // 4. Calculate final match score.
         double matchScore = matchScoreCalculator.calculate(
                 semanticScore,
-                skillScore);
+                skillScore,
+                hasSkills);
 
-        // 8. Return analysis result
+        // 5. Return analysis result.
         return new CVAnalysisResult(
                 request.analysisId(),
                 matchScore,
@@ -105,13 +68,22 @@ public class CVJDAnalysisService {
                 null);
     }
 
-    private String combineDocuments(List<Document> documents) {
+    private boolean hasValidSkills(JsonNode jd) {
 
-        return documents.stream()
-                .map(Document::getText)
-                .filter(text -> text != null && !text.isBlank())
-                .reduce((first, second) -> first + "\n" + second)
-                .orElse("");
+        JsonNode skills = jd.path("skills");
+
+        if (!skills.isArray()) {
+            return false;
+        }
+
+        for (JsonNode skill : skills) {
+            if (skill.path("name").isTextual()
+                    && !skill.path("name").asText().isBlank()) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private void validateRequest(CVAnalysisRequest request) {

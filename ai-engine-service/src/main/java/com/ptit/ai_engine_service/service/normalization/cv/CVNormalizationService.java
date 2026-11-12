@@ -8,6 +8,11 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.ptit.ai_engine_service.service.normalization.skill.SkillNormalizationService;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.regex.Pattern;
+
 import java.util.HashSet;
 import java.util.Locale;
 import java.util.Set;
@@ -17,16 +22,11 @@ public class CVNormalizationService {
 
     private final ObjectMapper objectMapper;
     private final SkillNormalizationService skillNormalizationService;
-
-    // private static final Set<String> VALID_SKILL_CATEGORIES = Set.of(
-    // "PROGRAMMING_LANGUAGE",
-    // "FRAMEWORK",
-    // "DATABASE",
-    // "TOOL",
-    // "PLATFORM",
-    // "RUNTIME",
-    // "SOFT_SKILL",
-    // "OTHER");
+    // Tách các kỹ năng gộp trong cùng một chuỗi: "Java, Spring Boot", "React &
+    // Redux", "Java and SQL"
+    private static final Pattern TECH_SEPARATORS = Pattern.compile(
+            "\\s*[,;|•\\n]\\s*|\\s+(?:&|\\+|and|và)\\s+",
+            Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
 
     public CVNormalizationService(
             ObjectMapper objectMapper,
@@ -186,7 +186,7 @@ public class CVNormalizationService {
             // Chuẩn hóa danh sách công nghệ được trích xuất riêng.
             normalized.set(
                     "technologies",
-                    normalizeStringArray(item.path("technologies")));
+                    normalizeTechnologies(item.path("technologies")));
 
             result.add(normalized);
         }
@@ -227,7 +227,7 @@ public class CVNormalizationService {
 
             normalized.set(
                     "technologies",
-                    normalizeStringArray(item.path("technologies")));
+                    normalizeTechnologies(item.path("technologies")));
 
             result.add(normalized);
         }
@@ -381,6 +381,82 @@ public class CVNormalizationService {
     // --------------------------------------------------
     // COMMON NORMALIZATION
     // --------------------------------------------------
+    /**
+     * Chuẩn hóa technologies[] bằng cùng từ điển với skills[].
+     * Tách chuỗi chứa nhiều kỹ năng trước khi tra từ điển.
+     * Không áp dụng cho description[] để giữ nguyên bằng chứng gốc.
+     */
+    private ArrayNode normalizeTechnologies(JsonNode source) {
+        ArrayNode result = objectMapper.createArrayNode();
+
+        if (source == null || !source.isArray()) {
+            return result;
+        }
+
+        Set<String> processed = new HashSet<>();
+
+        for (JsonNode item : source) {
+            String text = normalizeText(item);
+
+            if (text == null) {
+                continue;
+            }
+
+            for (String token : splitTechnologies(text)) {
+                SkillNormalizationService.NormalizedSkill skill = skillNormalizationService.normalize(token, null);
+
+                if (skill == null || skill.name() == null || skill.name().isBlank()) {
+                    continue;
+                }
+
+                String name = skill.name().trim();
+
+                if (processed.add(name.toLowerCase(Locale.ROOT))) {
+                    result.add(name);
+                }
+            }
+        }
+
+        return result;
+    }
+
+    private List<String> splitTechnologies(String text) {
+        // Cả chuỗi đã là một kỹ năng trong từ điển ("Spring Boot", "Node.js") thì không
+        // tách.
+        if (skillNormalizationService.findKnown(text).isPresent()) {
+            return List.of(text);
+        }
+
+        List<String> tokens = new ArrayList<>();
+
+        for (String part : TECH_SEPARATORS.split(text)) {
+            String token = part.trim();
+
+            if (!token.isEmpty()) {
+                tokens.addAll(splitBySlash(token));
+            }
+        }
+
+        return tokens;
+    }
+
+    /**
+     * Chỉ tách theo "/" khi TẤT CẢ các phần đều là kỹ năng đã biết ("HTML/CSS"),
+     * để không làm hỏng các tên như "CI/CD", "TCP/IP", "UI/UX".
+     */
+    private List<String> splitBySlash(String token) {
+        if (!token.contains("/")
+                || skillNormalizationService.findKnown(token).isPresent()) {
+            return List.of(token);
+        }
+
+        String[] parts = token.split("\\s*/\\s*");
+
+        boolean allKnown = Arrays.stream(parts)
+                .allMatch(part -> !part.isBlank() && skillNormalizationService.findKnown(part).isPresent());
+
+        return allKnown ? Arrays.asList(parts) : List.of(token);
+    }
 
     private ArrayNode normalizeStringArray(JsonNode source) {
         ArrayNode result = objectMapper.createArrayNode();

@@ -1,82 +1,93 @@
 {
   "skills": [
-    {
-      "id": "S001",
-      "name": "Java",
-      "aliases": ["Java SE", "Java Standard Edition"],
-      "category": "PROGRAMMING_LANGUAGE"
-    },
-    {
-      "id": "S002",
-      "name": "JavaScript",
-      "aliases": ["JS", "Java Script"],
-      "category": "PROGRAMMING_LANGUAGE"
-    },
-    {
-      "id": "S003",
-      "name": "TypeScript",
-      "aliases": ["TS"],
-      "category": "PROGRAMMING_LANGUAGE"
-    },
-    {
-      "id": "S004",
-      "name": "Python",
-      "aliases": ["Python 3"],
-      "category": "PROGRAMMING_LANGUAGE"
-    },
-    {
-      "id": "S005",
-      "name": "React",
-      "aliases": ["ReactJS", "React.js"],
-      "category": "FRAMEWORK"
-    },
-    {
-      "id": "S006",
-      "name": "Node.js",
-      "aliases": ["NodeJS", "Node JS"],
-      "category": "RUNTIME"
-    },
-    {
-      "id": "S007",
-      "name": "Spring Boot",
-      "aliases": ["Springboot", "SpringBoot"],
-      "category": "FRAMEWORK"
-    },
-    {
-      "id": "S008",
-      "name": "Spring Framework",
-      "aliases": ["Spring"],
-      "category": "FRAMEWORK"
-    },
-    {
-      "id": "S009",
-      "name": "PostgreSQL",
-      "aliases": ["Postgre SQL", "Postgres", "PostgreSQL Database"],
-      "category": "DATABASE"
-    },
-    {
-      "id": "S010",
-      "name": "MySQL",
-      "aliases": ["My SQL"],
-      "category": "DATABASE"
-    },
-    {
-      "id": "S011",
-      "name": "MongoDB",
-      "aliases": ["Mongo DB"],
-      "category": "DATABASE"
-    },
-    {
-      "id": "S012",
-      "name": "Docker",
-      "aliases": [],
-      "category": "TOOL"
-    },
-    {
-      "id": "S013",
-      "name": "Kubernetes",
-      "aliases": ["K8s"],
-      "category": "TOOL"
-    }
+    { "id": "S001", "name": "Java", "aliases": ["Java SE", "Java Standard Edition"], "category": "PROGRAMMING_LANGUAGE" },
+    { "id": "S002", "name": "JavaScript", "aliases": ["JS", "Java Script", "ECMAScript"], "category": "PROGRAMMING_LANGUAGE" },
+    { "id": "S003", "name": "TypeScript", "aliases": ["TS"], "category": "PROGRAMMING_LANGUAGE" },
+    { "id": "S004", "name": "Python", "aliases": ["Python 3"], "category": "PROGRAMMING_LANGUAGE" },
+    { "id": "S005", "name": "React", "aliases": ["ReactJS", "React.js"], "category": "FRAMEWORK" },
+    { "id": "S006", "name": "Node.js", "aliases": ["NodeJS", "Node JS"], "category": "RUNTIME" },
+    { "id": "S007", "name": "Spring Boot", "aliases": ["Springboot", "SpringBoot"], "category": "FRAMEWORK" },
+    { "id": "S008", "name": "Spring Framework", "aliases": ["Spring"], "category": "FRAMEWORK" },
+    { "id": "S009", "name": "PostgreSQL", "aliases": ["Postgre SQL", "Postgres", "PostgreSQL Database"], "category": "DATABASE" },
+    { "id": "S010", "name": "MySQL", "aliases": ["My SQL"], "category": "DATABASE" },
+    { "id": "S011", "name": "MongoDB", "aliases": ["Mongo DB"], "category": "DATABASE" },
+    { "id": "S012", "name": "Docker", "aliases": [], "category": "TOOL" },
+    { "id": "S013", "name": "Kubernetes", "aliases": ["K8s"], "category": "TOOL" },
+
+    { "id": "S014", "name": "C#", "aliases": ["CSharp", "C Sharp"], "category": "PROGRAMMING_LANGUAGE" },
+    { "id": "S015", "name": "C++", "aliases": ["CPP"], "category": "PROGRAMMING_LANGUAGE" },
+    { "id": "S016", "name": "C", "aliases": ["C Language"], "category": "PROGRAMMING_LANGUAGE" },
+    { "id": "S017", "name": "Go", "aliases": ["Golang"], "category": "PROGRAMMING_LANGUAGE" },
+    { "id": "S018", "name": "PHP", "aliases": [], "category": "PROGRAMMING_LANGUAGE" },
+    { "id": "S019", "name": "Kotlin", "aliases": [], "category": "PROGRAMMING_LANGUAGE" },
+    { "id": "S020", "name": "Swift", "aliases": [], "category": "PROGRAMMING_LANGUAGE" },
+    { "id": "S021", "name": "SQL", "aliases": ["Structured Query Language"], "category": "PROGRAMMING_LANGUAGE" },
+    { "id": "S022", "name": "HTML", "aliases": ["HTML5"], "category": "PROGRAMMING_LANGUAGE" },
+    { "id": "S023", "name": "CSS", "aliases": ["CSS3"], "category": "PROGRAMMING_LANGUAGE" },
+
+    { "id": "S024", "name": "Angular", "aliases": ["AngularJS", "Angular.js"], "category": "FRAMEWORK" },
+    { "id": "S025", "name": "Vue.js", "aliases": ["Vue", "VueJS"], "category": "FRAMEWORK" },
+    { "id": "S026", "name": "Next.js", "aliases": ["NextJS", "Next JS"], "category": "FRAMEWORK" },
+    { "id": "S027", "name": "Express.js", "aliases": ["Express", "ExpressJS"], "category": "FRAMEWORK" },
+    { "id": "S028", "name": "NestJS", "aliases": ["Nest.js"], "category": "FRAMEWORK" },
+    { "id": "S029", "name": "Django", "aliases": [], "category": "FRAMEWORK" },
+    { "id": "S030", "name": "Flask", "aliases": [], "category": "FRAMEWORK" },
+    { "id": "S031", "name": "FastAPI", "aliases": ["Fast API"], "category": "FRAMEWORK" },
+    { "id": "S032", "name": ".NET", "aliases": [".NET Core", "dotnet", "DotNet"], "category": "FRAMEWORK" },
+    { "id": "S033", "name": "ASP.NET", "aliases": ["ASP.NET Core", "ASP.NET MVC"], "category": "FRAMEWORK" },
+    { "id": "S034", "name": "Laravel", "aliases": [], "category": "FRAMEWORK" },
+    { "id": "S035", "name": "Hibernate", "aliases": [], "category": "FRAMEWORK" },
+    { "id": "S036", "name": "JPA", "aliases": ["Java Persistence API"], "category": "FRAMEWORK" },
+    { "id": "S037", "name": "Spring Data JPA", "aliases": ["Spring JPA"], "category": "FRAMEWORK" },
+    { "id": "S038", "name": "Spring Security", "aliases": [], "category": "FRAMEWORK" },
+    { "id": "S039", "name": "Spring Cloud", "aliases": [], "category": "FRAMEWORK" },
+    { "id": "S040", "name": "Spring MVC", "aliases": [], "category": "FRAMEWORK" },
+    { "id": "S041", "name": "Tailwind CSS", "aliases": ["Tailwind", "TailwindCSS"], "category": "FRAMEWORK" },
+    { "id": "S042", "name": "Bootstrap", "aliases": [], "category": "FRAMEWORK" },
+    { "id": "S043", "name": "React Native", "aliases": ["ReactNative"], "category": "FRAMEWORK" },
+    { "id": "S044", "name": "Flutter", "aliases": [], "category": "FRAMEWORK" },
+    { "id": "S045", "name": "JUnit", "aliases": ["JUnit 5", "JUnit5"], "category": "FRAMEWORK" },
+    { "id": "S046", "name": "Mockito", "aliases": [], "category": "FRAMEWORK" },
+
+    { "id": "S047", "name": "Redis", "aliases": [], "category": "DATABASE" },
+    { "id": "S048", "name": "SQL Server", "aliases": ["MSSQL", "Microsoft SQL Server", "MS SQL Server"], "category": "DATABASE" },
+    { "id": "S049", "name": "Oracle Database", "aliases": ["Oracle DB", "Oracle"], "category": "DATABASE" },
+    { "id": "S050", "name": "Elasticsearch", "aliases": ["Elastic Search", "ELK"], "category": "DATABASE" },
+    { "id": "S051", "name": "SQLite", "aliases": [], "category": "DATABASE" },
+    { "id": "S052", "name": "Qdrant", "aliases": [], "category": "DATABASE" },
+
+    { "id": "S053", "name": "Git", "aliases": [], "category": "TOOL" },
+    { "id": "S054", "name": "GitHub", "aliases": [], "category": "TOOL" },
+    { "id": "S055", "name": "GitLab", "aliases": [], "category": "TOOL" },
+    { "id": "S056", "name": "Maven", "aliases": ["Apache Maven"], "category": "TOOL" },
+    { "id": "S057", "name": "Gradle", "aliases": [], "category": "TOOL" },
+    { "id": "S058", "name": "Jenkins", "aliases": [], "category": "TOOL" },
+    { "id": "S059", "name": "GitHub Actions", "aliases": [], "category": "TOOL" },
+    { "id": "S060", "name": "CI/CD", "aliases": ["CICD", "CI CD"], "category": "TOOL" },
+    { "id": "S061", "name": "Postman", "aliases": [], "category": "TOOL" },
+    { "id": "S062", "name": "Swagger", "aliases": ["OpenAPI", "Swagger UI"], "category": "TOOL" },
+    { "id": "S063", "name": "Jira", "aliases": [], "category": "TOOL" },
+    { "id": "S064", "name": "Figma", "aliases": [], "category": "TOOL" },
+    { "id": "S065", "name": "Selenium", "aliases": [], "category": "TOOL" },
+    { "id": "S066", "name": "RabbitMQ", "aliases": ["Rabbit MQ"], "category": "TOOL" },
+    { "id": "S067", "name": "Kafka", "aliases": ["Apache Kafka"], "category": "TOOL" },
+    { "id": "S068", "name": "Nginx", "aliases": [], "category": "TOOL" },
+
+    { "id": "S069", "name": "AWS", "aliases": ["Amazon Web Services"], "category": "PLATFORM" },
+    { "id": "S070", "name": "Azure", "aliases": ["Microsoft Azure"], "category": "PLATFORM" },
+    { "id": "S071", "name": "GCP", "aliases": ["Google Cloud", "Google Cloud Platform"], "category": "PLATFORM" },
+    { "id": "S072", "name": "Linux", "aliases": ["Ubuntu"], "category": "PLATFORM" },
+    { "id": "S073", "name": "Android", "aliases": ["Android SDK"], "category": "PLATFORM" },
+
+    { "id": "S074", "name": "REST API", "aliases": ["REST", "RESTful", "RESTful API", "REST APIs", "RESTful Web Services"], "category": "OTHER" },
+    { "id": "S075", "name": "Microservices", "aliases": ["Microservice", "Micro Services"], "category": "OTHER" },
+    { "id": "S076", "name": "OOP", "aliases": ["Object Oriented Programming", "Object-Oriented Programming"], "category": "OTHER" },
+    { "id": "S077", "name": "Agile", "aliases": [], "category": "OTHER" },
+    { "id": "S078", "name": "Scrum", "aliases": [], "category": "OTHER" },
+    { "id": "S079", "name": "Data Structures and Algorithms", "aliases": ["DSA", "Data Structures", "Algorithms"], "category": "OTHER" },
+
+    { "id": "S080", "name": "Teamwork", "aliases": ["Team Work", "Collaboration"], "category": "SOFT_SKILL" },
+    { "id": "S081", "name": "Communication", "aliases": ["Communication Skills"], "category": "SOFT_SKILL" },
+    { "id": "S082", "name": "Problem Solving", "aliases": ["Problem-Solving"], "category": "SOFT_SKILL" }
   ]
 }
