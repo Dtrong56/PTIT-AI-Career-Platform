@@ -1,0 +1,140 @@
+.dashboard-shell {
+    min-height: 100vh;
+    background: #f5f7fb;
+    color: #1e293b;
+}
+
+.dashboard-header {
+    min-height: 76px;
+    padding: 14px 6%;
+    background: #ffffff;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.dashboard-brand {
+    color: #b91c1c;
+    font-size: 19px;
+    font-weight: 700;
+}
+
+.dashboard-role {
+    display: block;
+    margin-top: 5px;
+    color: #64748b;
+    font-size: 13px;
+}
+
+.dashboard-logout {
+    padding: 10px 20px;
+    border: 1px solid #b91c1c;
+    border-radius: 8px;
+    background: white;
+    color: #b91c1c;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.dashboard-logout:hover {
+    background: #fef2f2;
+}
+
+.dashboard-content {
+    width: 100%;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 55px 28px;
+}
+
+.dashboard-eyebrow {
+    color: #b91c1c;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+}
+
+.dashboard-content h1 {
+    margin: 12px 0;
+    color: #0f172a;
+    font-size: 32px;
+    font-weight: 700;
+}
+
+.dashboard-intro {
+    max-width: 650px;
+    margin-bottom: 35px;
+    color: #64748b;
+    font-size: 15px;
+    line-height: 1.7;
+}
+
+.dashboard-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 22px;
+}
+
+.dashboard-card {
+    min-height: 230px;
+    padding: 26px;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 14px;
+    box-shadow: 0 4px 15px rgba(15, 23, 42, 0.04);
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.dashboard-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 22px rgba(15, 23, 42, 0.08);
+}
+
+.dashboard-card-index {
+    color: #b91c1c;
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.dashboard-card h2 {
+    margin: 18px 0 12px;
+    color: #0f172a;
+    font-size: 19px;
+}
+
+.dashboard-card p {
+    min-height: 55px;
+    color: #64748b;
+    font-size: 14px;
+    line-height: 1.7;
+}
+
+.dashboard-status {
+    display: inline-block;
+    margin-top: 14px;
+    padding: 7px 11px;
+    border-radius: 6px;
+    background: #f1f5f9;
+    color: #64748b;
+    font-size: 12px;
+}
+
+@media (max-width: 768px) {
+    .dashboard-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .dashboard-content {
+        padding: 35px 18px;
+    }
+
+    .dashboard-content h1 {
+        font-size: 26px;
+    }
+
+    .dashboard-header {
+        padding: 14px 18px;
+    }
+}
