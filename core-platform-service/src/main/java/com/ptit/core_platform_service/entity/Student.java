@@ -17,11 +17,7 @@ import java.util.UUID;
 public class Student {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
-    private UUID studentId;
-
-    @Column(nullable = false)
-    private String name;
+    private UUID userId;
 
     @OneToMany(mappedBy = "student")
     @Builder.Default
@@ -30,9 +26,4 @@ public class Student {
     @OneToMany(mappedBy = "student")
     @Builder.Default
     private List<JD> jds = new ArrayList<>();
-
-    // methods
-    public UUID getId() {
-        return studentId;
-    }
 }
