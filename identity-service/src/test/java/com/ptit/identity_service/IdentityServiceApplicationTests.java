@@ -1,10 +1,10 @@
-package com.ptit.indentity_service;
+package com.ptit.identity_service;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 
 @SpringBootTest
-class IndentityServiceApplicationTests {
+class IdentityServiceApplicationTests {
 
 	@Test
 	void contextLoads() {
