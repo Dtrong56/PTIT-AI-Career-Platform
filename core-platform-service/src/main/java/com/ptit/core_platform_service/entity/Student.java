@@ -17,7 +17,7 @@ import java.util.UUID;
 public class Student {
 
     @Id
-    private UUID userId;
+    private UUID studentID;
 
     @OneToMany(mappedBy = "student")
     @Builder.Default
