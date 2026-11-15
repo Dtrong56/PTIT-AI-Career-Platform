@@ -4,6 +4,9 @@ import com.ptit.core_platform_service.entity.Student;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.UUID;
+import java.util.List;
 
 public interface StudentRepository extends JpaRepository<Student, UUID> {
+    // Hàm tìm theo userId
+    List<Student> findByUserId(UUID userId);
 }

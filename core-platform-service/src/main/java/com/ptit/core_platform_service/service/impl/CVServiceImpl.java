@@ -72,7 +72,7 @@ public class CVServiceImpl implements CVService {
 
                         CVPreprocessingRequest request = new CVPreprocessingRequest(
                                         savedCV.getCvId(),
-                                        student.getStudentId(),
+                                        student.getUserId(),
                                         file.getOriginalFilename(),
                                         file.getContentType(),
                                         file.getBytes());
@@ -106,7 +106,7 @@ public class CVServiceImpl implements CVService {
                 // 7. Thông báo Dashboard có CV mới
                 CVAddRequest addRequest = new CVAddRequest(
                                 savedCV.getCvId(),
-                                student.getStudentId());
+                                student.getUserId());
                 coreMessageProducer.sendCVAddEvent(addRequest);
 
                 // 8. Trả response
@@ -240,7 +240,7 @@ public class CVServiceImpl implements CVService {
 
                 return new CVResponse(
                                 cv.getCvId(),
-                                cv.getStudent().getStudentId(),
+                                cv.getStudent().getUserId(),
                                 cv.getStatus(),
                                 cv.getCreatedAt(),
                                 cv.getUpdatedAt());

@@ -43,9 +43,12 @@ public class JDServiceImpl implements JDService {
         @Transactional
         public JDResponse createJD(CreateJDRequest request) {
 
-                // 1. Kiểm tra student tồn tại
+                // 1. Tìm Student theo userId, nếu chưa tồn tại thì tạo mới
                 Student student = studentRepository.findById(request.studentId())
-                                .orElseThrow(() -> new RuntimeException("Student not found"));
+                                .orElseGet(() -> studentRepository.save(
+                                                Student.builder()
+                                                                .userId(request.studentId())
+                                                                .build()));
 
                 // 2. Tạo JD entity
                 JD jd = JD.builder()
@@ -60,19 +63,19 @@ public class JDServiceImpl implements JDService {
                 // 3. Lưu JD
                 JD savedJD = jdRepository.save(jd);
 
-                // 4. Thông báo cho Dashboard rằng JD mới đã được tạo
+                // 4. Thông báo Dashboard
                 coreMessageProducer.sendJDAddEvent(
                                 new JDAddRequest(
                                                 savedJD.getJdId(),
-                                                student.getStudentId()));
+                                                student.getUserId()));
 
-                // 5. Gửi JD sang AI Engine để preprocessing
+                // 5. Gửi JD sang AI Engine preprocessing
                 coreMessageProducer.sendJDPreprocessingRequest(
                                 new JDPreprocessingRequest(
                                                 savedJD.getJdId(),
                                                 savedJD.getRawContent()));
 
-                // 6. Trả response với status = PENDING
+                // 6. Trả response
                 return toResponse(savedJD);
         }
 
@@ -121,7 +124,7 @@ public class JDServiceImpl implements JDService {
                 coreMessageProducer.sendJDAddEvent(
                                 new JDAddRequest(
                                                 savedJD.getJdId(),
-                                                savedJD.getStudent().getStudentId()));
+                                                savedJD.getStudent().getUserId()));
         }
 
         /**
@@ -162,7 +165,7 @@ public class JDServiceImpl implements JDService {
 
                 return new JDResponse(
                                 jd.getJdId(),
-                                jd.getStudent().getStudentId(),
+                                jd.getStudent().getUserId(),
                                 jd.getTitle(),
                                 jd.getStatus(),
                                 jd.getCreatedAt(),
