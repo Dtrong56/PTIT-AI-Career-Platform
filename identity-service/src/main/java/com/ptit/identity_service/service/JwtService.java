@@ -14,39 +14,48 @@ import java.time.Instant;
 @Service
 public class JwtService {
 
-    private final JwtEncoder jwtEncoder;
-    private final long expirationSeconds;
+        private final JwtEncoder jwtEncoder;
+        private final long expirationSeconds;
 
-    public JwtService(
-            JwtEncoder jwtEncoder,
-            @Value("${app.jwt.expiration-seconds}") long expirationSeconds) {
+        public JwtService(
+                        JwtEncoder jwtEncoder,
+                        @Value("${app.jwt.expiration-seconds}") long expirationSeconds) {
 
-        this.jwtEncoder = jwtEncoder;
-        this.expirationSeconds = expirationSeconds;
-    }
+                this.jwtEncoder = jwtEncoder;
+                this.expirationSeconds = expirationSeconds;
+        }
 
-    public String generateToken(
-            String username,
-            String role,
-            boolean mustChangePassword) {
+        public String generateToken(
+                        String username,
+                        String role,
+                        boolean mustChangePassword,
+                        String studentId) {
 
-        Instant now = Instant.now();
+                Instant now = Instant.now();
 
-        JwtClaimsSet claims = JwtClaimsSet.builder()
-                .issuer("ptit-identity-service")
-                .issuedAt(now)
-                .expiresAt(now.plusSeconds(expirationSeconds))
-                .subject(username)
-                .claim("role", role)
-                .claim("mustChangePassword", mustChangePassword)
-                .build();
+                JwtClaimsSet.Builder claimsBuilder = JwtClaimsSet.builder()
+                                .issuer("ptit-identity-service")
+                                .issuedAt(now)
+                                .expiresAt(now.plusSeconds(expirationSeconds))
+                                .subject(username)
+                                .claim("role", role)
+                                .claim("mustChangePassword", mustChangePassword);
 
-        JwsHeader header = JwsHeader.with(MacAlgorithm.HS256)
-                .build();
+                // Chỉ thêm studentId đối với tài khoản sinh viên
+                if ("STUDENT".equals(role)
+                                && studentId != null
+                                && !studentId.isBlank()) {
 
-        JwtEncoderParameters parameters =
-                JwtEncoderParameters.from(header, claims);
+                        claimsBuilder.claim("studentId", studentId);
+                }
 
-        return jwtEncoder.encode(parameters).getTokenValue();
-    }
+                JwtClaimsSet claims = claimsBuilder.build();
+
+                JwsHeader header = JwsHeader.with(MacAlgorithm.HS256)
+                                .build();
+
+                JwtEncoderParameters parameters = JwtEncoderParameters.from(header, claims);
+
+                return jwtEncoder.encode(parameters).getTokenValue();
+        }
 }
