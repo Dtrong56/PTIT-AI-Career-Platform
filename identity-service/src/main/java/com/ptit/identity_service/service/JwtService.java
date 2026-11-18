@@ -28,18 +28,28 @@ public class JwtService {
         public String generateToken(
                         String username,
                         String role,
-                        boolean mustChangePassword) {
+                        boolean mustChangePassword,
+                        String studentId) {
 
                 Instant now = Instant.now();
 
-                JwtClaimsSet claims = JwtClaimsSet.builder()
+                JwtClaimsSet.Builder claimsBuilder = JwtClaimsSet.builder()
                                 .issuer("ptit-identity-service")
                                 .issuedAt(now)
                                 .expiresAt(now.plusSeconds(expirationSeconds))
                                 .subject(username)
                                 .claim("role", role)
-                                .claim("mustChangePassword", mustChangePassword)
-                                .build();
+                                .claim("mustChangePassword", mustChangePassword);
+
+                // Chỉ thêm studentId đối với tài khoản sinh viên
+                if ("STUDENT".equals(role)
+                                && studentId != null
+                                && !studentId.isBlank()) {
+
+                        claimsBuilder.claim("studentId", studentId);
+                }
+
+                JwtClaimsSet claims = claimsBuilder.build();
 
                 JwsHeader header = JwsHeader.with(MacAlgorithm.HS256)
                                 .build();
