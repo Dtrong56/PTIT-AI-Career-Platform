@@ -49,10 +49,8 @@ public class CVServiceImpl implements CVService {
                 // 1. Validate file
                 validateCVFile(file);
 
-                // 2. Kiểm tra student tồn tại
-                Student student = studentRepository
-                                .findById(studentId)
-                                .orElseThrow(() -> new RuntimeException("Student not found"));
+                // 2. Tìm Student theo userId, nếu chưa có thì tạo mới
+                Student student = getOrCreateStudent(studentId);
 
                 // 3. Tạo CV
                 LocalDateTime now = LocalDateTime.now();
@@ -72,7 +70,7 @@ public class CVServiceImpl implements CVService {
 
                         CVPreprocessingRequest request = new CVPreprocessingRequest(
                                         savedCV.getCvId(),
-                                        student.getUserId(),
+                                        student.getStudentID(),
                                         file.getOriginalFilename(),
                                         file.getContentType(),
                                         file.getBytes());
@@ -106,7 +104,7 @@ public class CVServiceImpl implements CVService {
                 // 7. Thông báo Dashboard có CV mới
                 CVAddRequest addRequest = new CVAddRequest(
                                 savedCV.getCvId(),
-                                student.getUserId());
+                                student.getStudentID());
                 coreMessageProducer.sendCVAddEvent(addRequest);
 
                 // 8. Trả response
@@ -183,11 +181,9 @@ public class CVServiceImpl implements CVService {
                 // 2. Kiểm tra kết quả từ AI
                 if (!result.success()) {
 
-                        cv.setStatus(
-                                        ProcessingStatus.FAILED);
+                        cv.setStatus(ProcessingStatus.FAILED);
 
-                        cv.setUpdatedAt(
-                                        LocalDateTime.now());
+                        cv.setUpdatedAt(LocalDateTime.now());
 
                         cvRepository.save(cv);
 
@@ -195,23 +191,36 @@ public class CVServiceImpl implements CVService {
                 }
 
                 // 3. Cập nhật raw text
-                cv.setRawText(
-                                result.rawText());
+                cv.setRawText(result.rawText());
 
                 // 4. Cập nhật structured content
-                cv.setStructuredContent(
-                                result.structuredData());
+                cv.setStructuredContent(result.structuredData());
 
                 // 5. Cập nhật trạng thái hoàn thành
-                cv.setStatus(
-                                ProcessingStatus.COMPLETED);
+                cv.setStatus(ProcessingStatus.COMPLETED);
 
                 // 6. Cập nhật thời gian
-                cv.setUpdatedAt(
-                                LocalDateTime.now());
+                cv.setUpdatedAt(LocalDateTime.now());
 
                 // 7. Lưu CV
                 cvRepository.save(cv);
+        }
+
+        /**
+         * Hàm tìm hoặc khởi tạo Student
+         * 
+         * @param userId
+         * @return
+         */
+        private Student getOrCreateStudent(UUID userId) {
+                return studentRepository.findByUserId(userId)
+                                .orElseGet(() -> {
+                                        Student student = Student.builder()
+                                                        .studentID(userId)
+                                                        .build();
+
+                                        return studentRepository.save(student);
+                                });
         }
 
         /**
@@ -221,14 +230,12 @@ public class CVServiceImpl implements CVService {
                         MultipartFile file) {
 
                 if (file == null || file.isEmpty()) {
-                        throw new IllegalArgumentException(
-                                        "CV file must not be empty");
+                        throw new IllegalArgumentException("CV file must not be empty");
                 }
 
                 if (!"application/pdf".equalsIgnoreCase(
                                 file.getContentType())) {
-                        throw new IllegalArgumentException(
-                                        "CV file must be PDF");
+                        throw new IllegalArgumentException("CV file must be PDF");
                 }
         }
 
@@ -240,7 +247,7 @@ public class CVServiceImpl implements CVService {
 
                 return new CVResponse(
                                 cv.getCvId(),
-                                cv.getStudent().getUserId(),
+                                cv.getStudent().getStudentID(),
                                 cv.getStatus(),
                                 cv.getCreatedAt(),
                                 cv.getUpdatedAt());

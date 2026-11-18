@@ -363,7 +363,7 @@ public class AnalysisServiceImpl implements AnalysisService {
                                 // CV -> Student -> studentId
                                 analysis.getCv()
                                                 .getStudent()
-                                                .getUserId(),
+                                                .getStudentID(),
 
                                 analysis.getCv().getCvId(),
 
