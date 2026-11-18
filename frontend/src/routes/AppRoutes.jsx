@@ -194,6 +194,15 @@ function AppRoutes() {
                     </ProtectedRoute>
                 }
             />
+            {/* TEST giao diện Dashboard Sinh viên */}
+            <Route
+                path="/test-student-dashboard"
+                element={
+                    <StudentDashboardPage
+                        onLogout={() => {}}
+                    />
+                }
+            />
 
             {/* Dashboard Khoa */}
             <Route

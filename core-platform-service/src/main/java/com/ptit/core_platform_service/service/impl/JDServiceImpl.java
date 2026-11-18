@@ -47,7 +47,7 @@ public class JDServiceImpl implements JDService {
                 Student student = studentRepository.findById(request.studentId())
                                 .orElseGet(() -> studentRepository.save(
                                                 Student.builder()
-                                                                .userId(request.studentId())
+                                                                .studentID(request.studentId())
                                                                 .build()));
 
                 // 2. Tạo JD entity
@@ -67,7 +67,7 @@ public class JDServiceImpl implements JDService {
                 coreMessageProducer.sendJDAddEvent(
                                 new JDAddRequest(
                                                 savedJD.getJdId(),
-                                                student.getUserId()));
+                                                student.getStudentID()));
 
                 // 5. Gửi JD sang AI Engine preprocessing
                 coreMessageProducer.sendJDPreprocessingRequest(
@@ -124,7 +124,7 @@ public class JDServiceImpl implements JDService {
                 coreMessageProducer.sendJDAddEvent(
                                 new JDAddRequest(
                                                 savedJD.getJdId(),
-                                                savedJD.getStudent().getUserId()));
+                                                savedJD.getStudent().getStudentID()));
         }
 
         /**
@@ -165,7 +165,7 @@ public class JDServiceImpl implements JDService {
 
                 return new JDResponse(
                                 jd.getJdId(),
-                                jd.getStudent().getUserId(),
+                                jd.getStudent().getStudentID(),
                                 jd.getTitle(),
                                 jd.getStatus(),
                                 jd.getCreatedAt(),

@@ -21,7 +21,7 @@ public class CV {
     private UUID cvId;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "user_id", nullable = false)
+    @JoinColumn(name = "student_id", nullable = false)
     private Student student;
 
     @Column(columnDefinition = "TEXT")

@@ -1,10 +1,8 @@
 package com.ptit.core_platform_service.controller;
 
 import com.ptit.core_platform_service.dto.cv.CVResponse;
-import com.ptit.core_platform_service.dto.cv.CreateCVRequest;
 import com.ptit.core_platform_service.entity.enums.ProcessingStatus;
 import com.ptit.core_platform_service.service.CVService;
-import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
 import org.springframework.http.MediaType;
